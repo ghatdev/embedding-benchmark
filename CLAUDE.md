@@ -107,3 +107,7 @@ cargo run --release -- test embedding-gemma --backend mistralrs --quantization q
   - macOS: `features = ["metal"]`
   - NVIDIA: `features = ["cuda"]` (optionally add `flash-attn`, `cudnn`)
   - Intel CPU: `features = ["mkl"]`
+- FastEmbed uses ONNX Runtime (ort) which supports GPU acceleration:
+  - NVIDIA: add `ort = { version = "2", features = ["cuda"] }`
+  - Apple: add `ort = { version = "2", features = ["coreml"] }`
+  - Windows: add `ort = { version = "2", features = ["directml"] }`

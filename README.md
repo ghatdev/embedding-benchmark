@@ -30,7 +30,32 @@ See the full benchmark report: **[docs/public_embedding_benchmark_report.md](doc
 
 ### Supported Hardware
 
-This benchmark uses [mistral.rs](https://github.com/EricLBuehler/mistral.rs) which supports multiple acceleration backends:
+This benchmark supports two embedding backends with different hardware acceleration options:
+
+#### FastEmbed (ONNX Runtime)
+
+[FastEmbed](https://github.com/Anush008/fastembed-rs) uses ONNX Runtime via the [ort](https://docs.rs/ort) crate:
+
+| Platform | Execution Provider | Cargo Feature |
+|----------|-------------------|---------------|
+| **NVIDIA GPU** | CUDA | `ort = { version = "2", features = ["cuda"] }` |
+| **NVIDIA GPU** | TensorRT | `ort = { version = "2", features = ["tensorrt"] }` |
+| **Apple Silicon** | CoreML | `ort = { version = "2", features = ["coreml"] }` |
+| **Windows GPU** | DirectML | `ort = { version = "2", features = ["directml"] }` |
+| **Generic CPU** | Default | (no extra features needed) |
+
+To enable GPU acceleration for FastEmbed, add ort features to `Cargo.toml`:
+
+```toml
+# Add ort with your desired execution provider
+ort = { version = "2", features = ["cuda"] }  # For NVIDIA GPU
+```
+
+Then configure execution providers in code or use the default CPU fallback.
+
+#### MistralRS (Candle)
+
+[Mistral.rs](https://github.com/EricLBuehler/mistral.rs) uses Candle for inference:
 
 | Platform | Backend | Device Config | Build Features |
 |----------|---------|---------------|----------------|
@@ -45,17 +70,20 @@ This benchmark uses [mistral.rs](https://github.com/EricLBuehler/mistral.rs) whi
 The default build uses **Metal** (macOS). To build for other platforms, modify `Cargo.toml`:
 
 ```toml
-# For NVIDIA GPU (Linux/Windows)
+# MistralRS for NVIDIA GPU (Linux/Windows)
 mistralrs = { git = "https://github.com/EricLBuehler/mistral.rs.git", features = ["cuda"] }
 
-# For NVIDIA GPU with Flash Attention (recommended for best performance)
+# MistralRS with Flash Attention (recommended for best performance)
 mistralrs = { git = "https://github.com/EricLBuehler/mistral.rs.git", features = ["cuda", "flash-attn", "cudnn"] }
 
-# For Intel CPU with MKL
+# MistralRS for Intel CPU with MKL
 mistralrs = { git = "https://github.com/EricLBuehler/mistral.rs.git", features = ["mkl"] }
 
-# For Apple Silicon (default)
+# MistralRS for Apple Silicon (default)
 mistralrs = { git = "https://github.com/EricLBuehler/mistral.rs.git", features = ["metal"] }
+
+# FastEmbed with CUDA (optional, for GPU-accelerated ONNX models)
+ort = { version = "2", features = ["cuda"] }
 ```
 
 Then configure your device in `models.toml`:
