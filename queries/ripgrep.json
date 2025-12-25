@@ -1,0 +1,441 @@
+{
+  "metadata": {
+    "name": "ripgrep",
+    "description": "Queries for ripgrep - fast line-oriented search tool",
+    "version": "2.0"
+  },
+  "queries": [
+    {
+      "query": "main entry point ripgrep",
+      "difficulty": "Simple",
+      "query_type": "Code",
+      "expected_files": ["crates/core/main.rs"],
+      "description": "Navigation: main entry point",
+      "answer_keywords": ["fn main", "ExitCode", "run"]
+    },
+    {
+      "query": "CLI flag definitions",
+      "difficulty": "Simple",
+      "query_type": "Code",
+      "expected_files": ["crates/core/flags/defs.rs"],
+      "description": "Navigation: flag definitions",
+      "answer_keywords": ["impl Flag", "is_switch", "AfterContext"]
+    },
+    {
+      "query": "regex matcher implementation",
+      "difficulty": "Simple",
+      "query_type": "Code",
+      "expected_files": ["crates/regex/src/matcher.rs", "crates/matcher/src/lib.rs"],
+      "description": "Navigation: regex matcher",
+      "answer_keywords": ["RegexMatcher", "Matcher", "RegexMatcherBuilder"]
+    },
+    {
+      "query": "gitignore file handling",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/ignore/src/gitignore.rs"],
+      "description": "Navigation: gitignore support",
+      "answer_keywords": ["Gitignore", "GitignoreBuilder", "matched"]
+    },
+    {
+      "query": "JSON output printer",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/printer/src/json.rs"],
+      "description": "Navigation: JSON printer",
+      "answer_keywords": ["JSON", "JSONBuilder", "json"]
+    },
+    {
+      "query": "PCRE2 regex engine",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/pcre2/src/matcher.rs"],
+      "description": "Navigation: PCRE2 support",
+      "answer_keywords": ["PCRE2", "pcre2", "RegexMatcher"]
+    },
+    {
+      "query": "glob pattern matching",
+      "difficulty": "Simple",
+      "query_type": "Code",
+      "expected_files": ["crates/globset/src/lib.rs", "crates/globset/src/glob.rs"],
+      "description": "Navigation: glob matching",
+      "answer_keywords": ["GlobSet", "Glob", "GlobMatcher"]
+    },
+    {
+      "query": "shell completion generation",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/core/flags/complete/bash.rs", "crates/core/flags/complete/zsh.rs"],
+      "description": "Navigation: shell completions",
+      "answer_keywords": ["complete", "bash", "zsh", "generate"]
+    },
+    {
+      "query": "search worker high level orchestration",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/core/search.rs"],
+      "description": "Navigation: search orchestration",
+      "answer_keywords": ["SearchWorkerBuilder", "SearchWorker", "search_zip"]
+    },
+    {
+      "query": "sink trait for search results",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/searcher/src/sink.rs"],
+      "description": "Navigation: sink trait",
+      "answer_keywords": ["Sink", "SinkError", "SinkMatch"]
+    },
+    {
+      "query": "match statistics tracking",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/printer/src/stats.rs"],
+      "description": "Navigation: statistics",
+      "answer_keywords": ["Stats", "bytes_searched", "matched_lines"]
+    },
+    {
+      "query": "terminal hyperlink support",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/printer/src/hyperlink/mod.rs"],
+      "description": "Navigation: hyperlinks",
+      "answer_keywords": ["HyperlinkConfig", "HyperlinkFormat", "HyperlinkEnvironment"]
+    },
+    {
+      "query": "override patterns include exclude",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/ignore/src/overrides.rs"],
+      "description": "Navigation: overrides",
+      "answer_keywords": ["Override", "OverrideBuilder", "whitelist"]
+    },
+    {
+      "query": "how does parallel directory traversal work",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/ignore/src/walk.rs"],
+      "description": "Semantic: parallel traversal",
+      "answer_keywords": ["WalkParallel", "parallel", "thread"]
+    },
+    {
+      "query": "binary file detection logic",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/searcher/src/searcher/core.rs"],
+      "description": "Semantic: binary detection",
+      "answer_keywords": ["binary", "BinaryDetection", "binary_byte_offset"]
+    },
+    {
+      "query": "memory mapped file search",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/searcher/src/searcher/mmap.rs"],
+      "description": "Semantic: mmap search",
+      "answer_keywords": ["Mmap", "MmapChoice", "mmap"]
+    },
+    {
+      "query": "context lines before after match",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/searcher/src/lines.rs"],
+      "description": "Semantic: context lines",
+      "answer_keywords": ["line", "LineIter", "preceding"]
+    },
+    {
+      "query": "file type filtering mechanism",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/ignore/src/types.rs"],
+      "description": "Semantic: file type filtering",
+      "answer_keywords": ["Types", "TypesBuilder", "FileTypeDef"]
+    },
+    {
+      "query": "color output terminal formatting",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/printer/src/color.rs"],
+      "description": "Semantic: color output",
+      "answer_keywords": ["Color", "ColorSpecs", "termcolor"]
+    },
+    {
+      "query": "incremental search line by line",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/searcher/src/line_buffer.rs"],
+      "description": "Semantic: line-by-line search",
+      "answer_keywords": ["LineBuffer", "LineBufferReader", "buffer"]
+    },
+    {
+      "query": "configuration file parsing ripgreprc",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/core/flags/config.rs"],
+      "description": "Semantic: config file parsing",
+      "answer_keywords": ["config", "RIPGREP_CONFIG", "parse"]
+    },
+    {
+      "query": "how does decompression work for compressed files",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/cli/src/decompress.rs"],
+      "description": "Semantic: decompression",
+      "answer_keywords": ["DecompressionMatcher", "DecompressionMatcherBuilder", "gzip"]
+    },
+    {
+      "query": "capture group replacement interpolation",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/matcher/src/interpolate.rs"],
+      "description": "Semantic: replacement",
+      "answer_keywords": ["interpolate", "cap_ref", "replacement"]
+    },
+    {
+      "query": "inner literal extraction optimization",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/regex/src/literal.rs"],
+      "description": "Semantic: literal optimization",
+      "answer_keywords": ["InnerLiterals", "Seq", "literal"]
+    },
+    {
+      "query": "default file type definitions rust python javascript",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/ignore/src/default_types.rs"],
+      "description": "Semantic: default types",
+      "answer_keywords": ["DEFAULT_TYPES", "rust", "python"]
+    },
+    {
+      "query": "human readable byte size parsing",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/cli/src/human.rs"],
+      "description": "Semantic: human sizes",
+      "answer_keywords": ["ParseSizeError", "parse_human", "human"]
+    },
+    {
+      "query": "pattern escaping special characters",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/cli/src/escape.rs"],
+      "description": "Semantic: escaping",
+      "answer_keywords": ["escape", "unescape", "Escape"]
+    },
+    {
+      "query": "count only mode match counting",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/printer/src/counter.rs"],
+      "description": "Semantic: counting",
+      "answer_keywords": ["CounterWriter", "count", "counter"]
+    },
+    {
+      "query": "forbidden regex patterns word boundary",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/regex/src/ban.rs"],
+      "description": "Semantic: banned patterns",
+      "answer_keywords": ["ban", "check", "Banned"]
+    },
+    {
+      "query": "regex AST analysis and transformation",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/regex/src/ast.rs"],
+      "description": "Semantic: regex AST",
+      "answer_keywords": ["Hir", "ast", "analyze"]
+    },
+    {
+      "query": "path normalization utilities cross platform",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/globset/src/pathutil.rs"],
+      "description": "Semantic: path utils",
+      "answer_keywords": ["normalize", "path", "separator"]
+    },
+    {
+      "query": "all printer format implementations",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/printer/src/standard.rs", "crates/printer/src/json.rs", "crates/printer/src/summary.rs"],
+      "description": "Structural: printer formats",
+      "answer_keywords": ["Standard", "JSON", "Summary", "Printer"]
+    },
+    {
+      "query": "flag parsing module structure",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/core/flags/parse.rs", "crates/core/flags/lowargs.rs", "crates/core/flags/hiargs.rs"],
+      "description": "Structural: flag parsing layers",
+      "answer_keywords": ["LowArgs", "HiArgs", "parse", "Args"]
+    },
+    {
+      "query": "ignore module components",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/ignore/src/lib.rs", "crates/ignore/src/dir.rs", "crates/ignore/src/walk.rs"],
+      "description": "Structural: ignore crate",
+      "answer_keywords": ["Walk", "WalkBuilder", "Ignore"]
+    },
+    {
+      "query": "grep facade library exports",
+      "difficulty": "Simple",
+      "query_type": "Code",
+      "expected_files": ["crates/grep/src/lib.rs"],
+      "description": "Structural: grep facade",
+      "answer_keywords": ["pub use", "grep_matcher", "grep_searcher"]
+    },
+    {
+      "query": "searcher module organization",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/searcher/src/lib.rs", "crates/searcher/src/searcher/mod.rs"],
+      "description": "Structural: searcher crate",
+      "answer_keywords": ["Searcher", "SearcherBuilder", "Sink"]
+    },
+    {
+      "query": "CLI utilities shared code",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/cli/src/lib.rs"],
+      "description": "Structural: CLI utils",
+      "answer_keywords": ["pattern", "hostname", "escape"]
+    },
+    {
+      "query": "regex crate internal modules",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/regex/src/lib.rs", "crates/regex/src/config.rs"],
+      "description": "Structural: regex crate",
+      "answer_keywords": ["RegexMatcher", "Config", "RegexMatcherBuilder"]
+    },
+    {
+      "query": "shell completion implementations all shells",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/core/flags/complete/bash.rs", "crates/core/flags/complete/zsh.rs", "crates/core/flags/complete/fish.rs", "crates/core/flags/complete/powershell.rs"],
+      "description": "Structural: completions",
+      "answer_keywords": ["bash", "zsh", "fish", "powershell"]
+    },
+    {
+      "query": "help and man page generation documentation",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["crates/core/flags/doc/help.rs", "crates/core/flags/doc/man.rs"],
+      "description": "Structural: help generation",
+      "answer_keywords": ["help", "man", "generate"]
+    },
+    {
+      "query": "printer helper utilities formatting",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["crates/printer/src/util.rs"],
+      "description": "Structural: printer utils",
+      "answer_keywords": ["util", "formatter", "write"]
+    },
+    {
+      "query": "ripgrep user guide tutorial",
+      "difficulty": "Simple",
+      "query_type": "Doc",
+      "expected_files": ["GUIDE.md"],
+      "description": "Doc: user guide",
+      "answer_keywords": ["guide", "tutorial", "basics"]
+    },
+    {
+      "query": "frequently asked questions FAQ",
+      "difficulty": "Simple",
+      "query_type": "Doc",
+      "expected_files": ["FAQ.md"],
+      "description": "Doc: FAQ",
+      "answer_keywords": ["FAQ", "frequently", "asked"]
+    },
+    {
+      "query": "project readme installation",
+      "difficulty": "Simple",
+      "query_type": "Doc",
+      "expected_files": ["README.md"],
+      "description": "Doc: readme",
+      "answer_keywords": ["README", "installation", "ripgrep"]
+    },
+    {
+      "query": "changelog release notes history",
+      "difficulty": "Simple",
+      "query_type": "Doc",
+      "expected_files": ["CHANGELOG.md"],
+      "description": "Doc: changelog",
+      "answer_keywords": ["CHANGELOG", "release", "version"]
+    },
+    {
+      "query": "globset pattern matching documentation",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["crates/globset/README.md"],
+      "description": "Doc: globset readme",
+      "answer_keywords": ["globset", "glob", "pattern"]
+    },
+    {
+      "query": "ignore crate gitignore documentation",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["crates/ignore/README.md"],
+      "description": "Doc: ignore readme",
+      "answer_keywords": ["ignore", "gitignore", "recursive"]
+    },
+    {
+      "query": "searcher crate documentation",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["crates/searcher/README.md"],
+      "description": "Doc: searcher readme",
+      "answer_keywords": ["searcher", "grep", "search"]
+    },
+    {
+      "query": "printer output format documentation",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["crates/printer/README.md"],
+      "description": "Doc: printer readme",
+      "answer_keywords": ["printer", "output", "format"]
+    },
+    {
+      "query": "CLI utilities crate documentation",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["crates/cli/README.md"],
+      "description": "Doc: CLI readme",
+      "answer_keywords": ["cli", "command", "utilities"]
+    },
+    {
+      "query": "matcher crate abstraction documentation",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["crates/matcher/README.md"],
+      "description": "Doc: matcher readme",
+      "answer_keywords": ["matcher", "Matcher", "abstraction"]
+    },
+    {
+      "query": "regex crate rust regex documentation",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["crates/regex/README.md"],
+      "description": "Doc: regex readme",
+      "answer_keywords": ["regex", "RegexMatcher", "pattern"]
+    },
+    {
+      "query": "PCRE2 integration documentation",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["crates/pcre2/README.md"],
+      "description": "Doc: PCRE2 readme",
+      "answer_keywords": ["PCRE2", "pcre", "alternative"]
+    },
+    {
+      "query": "grep facade crate documentation",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["crates/grep/README.md"],
+      "description": "Doc: grep readme",
+      "answer_keywords": ["grep", "facade", "library"]
+    }
+  ]
+}

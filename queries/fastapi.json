@@ -1,0 +1,449 @@
+{
+  "metadata": {
+    "name": "fastapi",
+    "description": "Queries for FastAPI - modern Python web framework",
+    "version": "2.0"
+  },
+  "queries": [
+    {
+      "query": "FastAPI main application class",
+      "difficulty": "Simple",
+      "query_type": "Code",
+      "expected_files": ["fastapi/applications.py"],
+      "description": "Navigation: main app class",
+      "answer_keywords": ["class FastAPI", "Starlette", "app"]
+    },
+    {
+      "query": "APIRouter route decorator",
+      "difficulty": "Simple",
+      "query_type": "Code",
+      "expected_files": ["fastapi/routing.py"],
+      "description": "Navigation: router class",
+      "answer_keywords": ["APIRouter", "Router", "add_api_route"]
+    },
+    {
+      "query": "Query parameter function",
+      "difficulty": "Simple",
+      "query_type": "Code",
+      "expected_files": ["fastapi/param_functions.py"],
+      "description": "Navigation: Query param",
+      "answer_keywords": ["def Query", "Param", "default"]
+    },
+    {
+      "query": "OAuth2 password bearer implementation",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/security/oauth2.py"],
+      "description": "Navigation: OAuth2",
+      "answer_keywords": ["OAuth2PasswordBearer", "OAuth2", "tokenUrl"]
+    },
+    {
+      "query": "HTTP basic authentication",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/security/http.py"],
+      "description": "Navigation: HTTP auth",
+      "answer_keywords": ["HTTPBasic", "HTTPBearer", "HTTPAuthorizationCredentials"]
+    },
+    {
+      "query": "OpenAPI schema generation",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/openapi/utils.py"],
+      "description": "Navigation: OpenAPI schema",
+      "answer_keywords": ["get_openapi", "OpenAPI", "openapi_schema"]
+    },
+    {
+      "query": "Swagger UI HTML generation",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/openapi/docs.py"],
+      "description": "Navigation: Swagger UI",
+      "answer_keywords": ["get_swagger_ui_html", "swagger_ui", "HTMLResponse"]
+    },
+    {
+      "query": "dependency injection utilities",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/dependencies/utils.py"],
+      "description": "Navigation: DI utils",
+      "answer_keywords": ["Dependant", "solve_dependencies", "get_dependant"]
+    },
+    {
+      "query": "WebSocket connection handling",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/websockets.py"],
+      "description": "Navigation: WebSocket",
+      "answer_keywords": ["WebSocket", "WebSocketDisconnect", "WebSocketState"]
+    },
+    {
+      "query": "response types and classes",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/responses.py"],
+      "description": "Navigation: responses",
+      "answer_keywords": ["JSONResponse", "HTMLResponse", "ORJSONResponse", "UJSONResponse"]
+    },
+    {
+      "query": "API key authentication security",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/security/api_key.py"],
+      "description": "Navigation: API key",
+      "answer_keywords": ["APIKeyBase", "APIKeyHeader", "APIKeyQuery"]
+    },
+    {
+      "query": "OpenID Connect authentication",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["fastapi/security/open_id_connect_url.py"],
+      "description": "Navigation: OpenID Connect",
+      "answer_keywords": ["OpenIdConnect", "openIdConnectUrl", "SecurityBase"]
+    },
+    {
+      "query": "concurrency run in threadpool",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/concurrency.py"],
+      "description": "Navigation: concurrency",
+      "answer_keywords": ["run_in_threadpool", "contextmanager_in_threadpool", "CapacityLimiter"]
+    },
+    {
+      "query": "how does dependency injection resolve dependencies",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["fastapi/dependencies/utils.py", "fastapi/dependencies/models.py"],
+      "description": "Semantic: dependency resolution",
+      "answer_keywords": ["solve_dependencies", "Dependant", "sub_dependant"]
+    },
+    {
+      "query": "request body validation pydantic",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/params.py", "fastapi/encoders.py"],
+      "description": "Semantic: body validation",
+      "answer_keywords": ["Body", "Param", "validate", "Pydantic"]
+    },
+    {
+      "query": "path parameter extraction routing",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/routing.py"],
+      "description": "Semantic: path params",
+      "answer_keywords": ["path_params", "APIRoute", "request_handler"]
+    },
+    {
+      "query": "exception handling HTTPException",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/exceptions.py"],
+      "description": "Semantic: exception handling",
+      "answer_keywords": ["HTTPException", "status_code", "detail"]
+    },
+    {
+      "query": "background task execution",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/background.py"],
+      "description": "Semantic: background tasks",
+      "answer_keywords": ["BackgroundTasks", "add_task", "background"]
+    },
+    {
+      "query": "file upload handling multipart",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/datastructures.py"],
+      "description": "Semantic: file upload",
+      "answer_keywords": ["UploadFile", "file", "filename"]
+    },
+    {
+      "query": "Pydantic v1 v2 compatibility layer",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["fastapi/_compat/main.py"],
+      "description": "Semantic: Pydantic compat",
+      "answer_keywords": ["PYDANTIC_V2", "compat", "field_annotation"]
+    },
+    {
+      "query": "JSON encoding special types datetime",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/encoders.py"],
+      "description": "Semantic: JSON encoding",
+      "answer_keywords": ["jsonable_encoder", "datetime", "encoder"]
+    },
+    {
+      "query": "how to run blocking code async",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/concurrency.py"],
+      "description": "Semantic: blocking code",
+      "answer_keywords": ["run_in_threadpool", "contextmanager_in_threadpool", "anyio"]
+    },
+    {
+      "query": "custom JSON response orjson ujson performance",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/responses.py"],
+      "description": "Semantic: custom JSON",
+      "answer_keywords": ["ORJSONResponse", "UJSONResponse", "render"]
+    },
+    {
+      "query": "security scheme base class",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/security/base.py"],
+      "description": "Semantic: security base",
+      "answer_keywords": ["SecurityBase", "model", "scheme_name"]
+    },
+    {
+      "query": "default exception handler implementation",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/exception_handlers.py"],
+      "description": "Semantic: default handlers",
+      "answer_keywords": ["http_exception_handler", "request_validation_exception_handler", "JSONResponse"]
+    },
+    {
+      "query": "OpenAPI constants and versions",
+      "difficulty": "Simple",
+      "query_type": "Code",
+      "expected_files": ["fastapi/openapi/constants.py"],
+      "description": "Semantic: OpenAPI constants",
+      "answer_keywords": ["REF_PREFIX", "REF_TEMPLATE", "METHODS"]
+    },
+    {
+      "query": "trusted host validation middleware",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/middleware/trustedhost.py"],
+      "description": "Semantic: trusted host",
+      "answer_keywords": ["TrustedHostMiddleware", "allowed_hosts", "middleware"]
+    },
+    {
+      "query": "async context manager middleware",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["fastapi/middleware/asyncexitstack.py"],
+      "description": "Semantic: async context",
+      "answer_keywords": ["AsyncExitStackMiddleware", "asynccontextmanager", "stack"]
+    },
+    {
+      "query": "deprecated pydantic v1 compatibility types",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["fastapi/_compat/v1.py"],
+      "description": "Semantic: pydantic v1",
+      "answer_keywords": ["ModelField", "Validator", "v1"]
+    },
+    {
+      "query": "security module all authentication methods",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/security/oauth2.py", "fastapi/security/http.py", "fastapi/security/api_key.py"],
+      "description": "Structural: security module",
+      "answer_keywords": ["OAuth2", "HTTPBasic", "APIKey"]
+    },
+    {
+      "query": "openapi documentation generation components",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/openapi/utils.py", "fastapi/openapi/models.py", "fastapi/openapi/docs.py"],
+      "description": "Structural: openapi module",
+      "answer_keywords": ["OpenAPI", "get_openapi", "swagger"]
+    },
+    {
+      "query": "middleware implementations available",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/middleware/cors.py", "fastapi/middleware/httpsredirect.py", "fastapi/middleware/gzip.py"],
+      "description": "Structural: middleware",
+      "answer_keywords": ["CORSMiddleware", "HTTPSRedirectMiddleware", "GZipMiddleware"]
+    },
+    {
+      "query": "pydantic compatibility layer structure",
+      "difficulty": "Hard",
+      "query_type": "Code",
+      "expected_files": ["fastapi/_compat/main.py", "fastapi/_compat/v1.py", "fastapi/_compat/v2.py"],
+      "description": "Structural: compat layer",
+      "answer_keywords": ["PYDANTIC_V2", "ModelField", "compat"]
+    },
+    {
+      "query": "dependency injection module organization",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/dependencies/utils.py", "fastapi/dependencies/models.py"],
+      "description": "Structural: dependencies",
+      "answer_keywords": ["Dependant", "Security", "dependencies"]
+    },
+    {
+      "query": "all parameter types Query Path Body Form",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/param_functions.py", "fastapi/params.py"],
+      "description": "Structural: param types",
+      "answer_keywords": ["Query", "Path", "Body", "Form"]
+    },
+    {
+      "query": "all response types available",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/responses.py"],
+      "description": "Structural: response types",
+      "answer_keywords": ["JSONResponse", "HTMLResponse", "FileResponse", "StreamingResponse"]
+    },
+    {
+      "query": "security module exports initialization",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/security/__init__.py"],
+      "description": "Structural: security exports",
+      "answer_keywords": ["OAuth2PasswordBearer", "HTTPBasic", "APIKeyHeader"]
+    },
+    {
+      "query": "middleware module components",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/middleware/__init__.py", "fastapi/middleware/cors.py", "fastapi/middleware/trustedhost.py"],
+      "description": "Structural: middleware module",
+      "answer_keywords": ["CORSMiddleware", "TrustedHostMiddleware", "middleware"]
+    },
+    {
+      "query": "openapi models schema types",
+      "difficulty": "Medium",
+      "query_type": "Code",
+      "expected_files": ["fastapi/openapi/models.py"],
+      "description": "Structural: openapi models",
+      "answer_keywords": ["OpenAPI", "Info", "PathItem", "Schema"]
+    },
+    {
+      "query": "FastAPI getting started tutorial",
+      "difficulty": "Simple",
+      "query_type": "Doc",
+      "expected_files": ["README.md"],
+      "description": "Doc: getting started",
+      "answer_keywords": ["FastAPI", "Python", "framework"]
+    },
+    {
+      "query": "first steps tutorial example",
+      "difficulty": "Simple",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/first_steps/tutorial001_py39.py"],
+      "description": "Doc: first steps",
+      "answer_keywords": ["FastAPI", "app", "def"]
+    },
+    {
+      "query": "path parameters tutorial",
+      "difficulty": "Simple",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/path_params/tutorial001_py39.py"],
+      "description": "Doc: path params tutorial",
+      "answer_keywords": ["item_id", "path", "int"]
+    },
+    {
+      "query": "query parameters tutorial example",
+      "difficulty": "Simple",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/query_params/tutorial001_py39.py"],
+      "description": "Doc: query params tutorial",
+      "answer_keywords": ["skip", "limit", "query"]
+    },
+    {
+      "query": "dependency injection tutorial",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/dependencies/tutorial001_py39.py"],
+      "description": "Doc: dependencies tutorial",
+      "answer_keywords": ["Depends", "common_parameters", "dependency"]
+    },
+    {
+      "query": "security authentication tutorial",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/security/tutorial001_py39.py"],
+      "description": "Doc: security tutorial",
+      "answer_keywords": ["OAuth2PasswordBearer", "token", "security"]
+    },
+    {
+      "query": "SQL database integration tutorial",
+      "difficulty": "Hard",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/sql_databases/tutorial001_py39.py"],
+      "description": "Doc: SQL tutorial",
+      "answer_keywords": ["SQLAlchemy", "database", "Session"]
+    },
+    {
+      "query": "larger applications project structure",
+      "difficulty": "Hard",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/bigger_applications/app_py39/main.py"],
+      "description": "Doc: larger apps",
+      "answer_keywords": ["include_router", "routers", "APIRouter"]
+    },
+    {
+      "query": "WebSocket tutorial example",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/websockets/tutorial001_py39.py"],
+      "description": "Doc: WebSocket tutorial",
+      "answer_keywords": ["WebSocket", "websocket", "accept"]
+    },
+    {
+      "query": "application testing tutorial",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/app_testing/tutorial001_py39.py"],
+      "description": "Doc: testing tutorial",
+      "answer_keywords": ["TestClient", "test_", "client"]
+    },
+    {
+      "query": "handling errors tutorial example",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/handling_errors/tutorial001_py39.py"],
+      "description": "Doc: error handling tutorial",
+      "answer_keywords": ["HTTPException", "raise", "status_code"]
+    },
+    {
+      "query": "request files upload tutorial",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/request_files/tutorial001_py39.py"],
+      "description": "Doc: file upload tutorial",
+      "answer_keywords": ["UploadFile", "File", "filename"]
+    },
+    {
+      "query": "CORS middleware tutorial example",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/cors/tutorial001_py39.py"],
+      "description": "Doc: CORS tutorial",
+      "answer_keywords": ["CORSMiddleware", "allow_origins", "add_middleware"]
+    },
+    {
+      "query": "custom response types tutorial",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/custom_response/tutorial001_py39.py"],
+      "description": "Doc: custom response tutorial",
+      "answer_keywords": ["HTMLResponse", "Response", "response_class"]
+    },
+    {
+      "query": "background tasks tutorial example",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/background_tasks/tutorial001_py39.py"],
+      "description": "Doc: background tasks tutorial",
+      "answer_keywords": ["BackgroundTasks", "add_task", "background"]
+    },
+    {
+      "query": "request form data tutorial",
+      "difficulty": "Medium",
+      "query_type": "Doc",
+      "expected_files": ["docs_src/request_forms/tutorial001_an_py39.py"],
+      "description": "Doc: form data tutorial",
+      "answer_keywords": ["Form", "username", "password"]
+    }
+  ]
+}

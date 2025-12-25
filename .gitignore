@@ -1,0 +1,27 @@
+# Rust build artifacts
+/target/
+
+# FastEmbed model cache
+/.fastembed_cache/
+
+# macOS
+.DS_Store
+
+# Results (keep only important benchmark runs)
+/results/
+
+# Test codebases (clone your own)
+/codebases/*
+!/codebases/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.log
+
+.claude/

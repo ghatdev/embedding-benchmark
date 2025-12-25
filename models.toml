@@ -1,0 +1,101 @@
+# Embedding Benchmark Models Configuration
+#
+# MistralRS Models Only (Metal GPU)
+# 8 configurations for comprehensive testing
+
+# =============================================================================
+# EmbeddingGemma 300M - Google's small but high-quality model
+# 768 dims, ~0.6GB, previous benchmark winner
+# =============================================================================
+
+[[mistralrs]]
+model = "embedding-gemma"
+quantization = "none"
+device = "metal"
+# F16 - Full precision baseline
+
+[[mistralrs]]
+model = "embedding-gemma"
+quantization = "q8"
+device = "metal"
+# Q8_0 - 8-bit quantization
+
+[[mistralrs]]
+model = "embedding-gemma"
+quantization = "q4k"
+device = "metal"
+# Q4K - 4-bit quantization (lowest memory)
+
+# =============================================================================
+# Qwen3-Embedding 0.6B - Alibaba's compact embedding model
+# 1024 dims, ~1.2GB
+# =============================================================================
+
+[[mistralrs]]
+model = "qwen3-0.6b"
+quantization = "none"
+device = "metal"
+# F16 - Full precision baseline
+
+[[mistralrs]]
+model = "qwen3-0.6b"
+quantization = "q8"
+device = "metal"
+# Q8_0 - 8-bit quantization
+
+[[mistralrs]]
+model = "qwen3-0.6b"
+quantization = "q4k"
+device = "metal"
+# Q4K - 4-bit quantization (lowest memory)
+
+# =============================================================================
+# Qwen3-Embedding 4B - Larger model for quality comparison
+# 2560 dims, ~8GB - May require significant VRAM
+# =============================================================================
+
+[[mistralrs]]
+model = "qwen3-4b"
+quantization = "q4k"
+device = "metal"
+# Q4K only - F16 would need ~16GB VRAM
+
+# =============================================================================
+# Qwen3-Embedding 8B - Largest model (optional)
+# 4096 dims, ~16GB - Requires 32GB+ unified memory
+# =============================================================================
+
+# [[mistralrs]]
+# model = "qwen3-8b"
+# quantization = "q4k"
+# device = "metal"
+# # Uncomment if you have 32GB+ RAM
+
+# =============================================================================
+# FastEmbed Models (ONNX Runtime / CPU)
+# Good baselines for comparison
+# =============================================================================
+
+[[fastembed]]
+model = "BAAI/bge-small-en-v1.5"
+# 384 dims, fast baseline
+
+[[fastembed]]
+model = "BAAI/bge-base-en-v1.5"
+# 768 dims, balanced
+
+[[fastembed]]
+model = "jinaai/jina-embeddings-v2-base-code"
+# 768 dims, code-specialized
+
+[[fastembed]]
+model = "Alibaba-NLP/gte-large-en-v1.5"
+# 1024 dims, high quality
+
+[[fastembed]]
+model = "nomic-ai/nomic-embed-text-v1.5"
+# 768 dims, good general purpose
+
+[[fastembed]]
+model = "Snowflake/snowflake-arctic-embed-m"
+# 768 dims, recent high performer
