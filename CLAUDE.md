@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Embedding Benchmark is a Rust CLI tool for evaluating embedding models on code search tasks. It compares FastEmbed (ONNX/CPU) and MistralRS (Candle/Metal GPU) backends using file-level and answer-level retrieval metrics.
+Embedding Benchmark is a Rust CLI tool for evaluating embedding models on code search tasks. It compares FastEmbed (ONNX/CPU) and MistralRS (Candle) backends using file-level and answer-level retrieval metrics.
+
+**Supported platforms:** NVIDIA GPU (CUDA), Apple Silicon (Metal), Intel/AMD CPU (MKL/AVX)
 
 ## Build and Run Commands
 
@@ -100,4 +102,8 @@ cargo run --release -- test embedding-gemma --backend mistralrs --quantization q
 
 ## Dependencies Note
 
-Tree-sitter grammars must use compatible ABI versions (currently 0.23 for all). MistralRS requires Metal feature on macOS.
+- Tree-sitter grammars must use compatible ABI versions (currently 0.23 for all)
+- MistralRS requires platform-specific features in Cargo.toml:
+  - macOS: `features = ["metal"]`
+  - NVIDIA: `features = ["cuda"]` (optionally add `flash-attn`, `cudnn`)
+  - Intel CPU: `features = ["mkl"]`

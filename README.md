@@ -2,6 +2,19 @@
 
 A Rust CLI tool for evaluating embedding models on code search tasks. Compares FastEmbed (ONNX/CPU) and MistralRS (Candle/Metal GPU) backends using file-level and answer-level retrieval metrics.
 
+## About the Benchmark
+
+This benchmark was conducted to select an appropriate embedding model for a personal project building local RAG capabilities for AI coding agents. It is not designed to evaluate all embedding models comprehensively, but rather focuses on which models work best for **real-world codebases and technical documentation** in local development environments.
+
+**Key evaluation criteria:**
+- Retrieval quality for code snippets and technical documentation
+- Local performance (memory usage and inference speed)
+- Model size vs. accuracy tradeoffs for different hardware constraints
+
+While not academically rigorous, the benchmark aims to provide objective metrics for practical decision-making when choosing embedding models for code search and semantic search features.
+
+> **Note:** Results focus on code/documentation retrieval scenarios. General-purpose embedding tasks may favor different models.
+
 ## Latest Results
 
 See the full benchmark report: **[docs/public_embedding_benchmark_report.md](docs/public_embedding_benchmark_report.md)**
@@ -13,7 +26,48 @@ See the full benchmark report: **[docs/public_embedding_benchmark_report.md](doc
 ### Prerequisites
 
 - Rust 1.70+
-- macOS with Apple Silicon (for Metal GPU acceleration) or any platform for CPU-only mode
+- One of the supported hardware configurations (see below)
+
+### Supported Hardware
+
+This benchmark uses [mistral.rs](https://github.com/EricLBuehler/mistral.rs) which supports multiple acceleration backends:
+
+| Platform | Backend | Device Config | Build Features |
+|----------|---------|---------------|----------------|
+| **NVIDIA GPU** | CUDA | `device = "cuda"` | `cuda`, `flash-attn`, `cudnn` |
+| **Apple Silicon** | Metal | `device = "metal"` | `metal` |
+| **Intel CPU** | MKL | `device = "cpu"` | `mkl` |
+| **Apple CPU** | Accelerate | `device = "cpu"` | `accelerate` |
+| **Generic CPU** | AVX/NEON | `device = "cpu"` | (default) |
+
+#### Building for Your Hardware
+
+The default build uses **Metal** (macOS). To build for other platforms, modify `Cargo.toml`:
+
+```toml
+# For NVIDIA GPU (Linux/Windows)
+mistralrs = { git = "https://github.com/EricLBuehler/mistral.rs.git", features = ["cuda"] }
+
+# For NVIDIA GPU with Flash Attention (recommended for best performance)
+mistralrs = { git = "https://github.com/EricLBuehler/mistral.rs.git", features = ["cuda", "flash-attn", "cudnn"] }
+
+# For Intel CPU with MKL
+mistralrs = { git = "https://github.com/EricLBuehler/mistral.rs.git", features = ["mkl"] }
+
+# For Apple Silicon (default)
+mistralrs = { git = "https://github.com/EricLBuehler/mistral.rs.git", features = ["metal"] }
+```
+
+Then configure your device in `models.toml`:
+
+```toml
+[[mistralrs]]
+model = "embedding-gemma"
+quantization = "q8"
+device = "cuda"    # or "metal", "cpu"
+```
+
+> **Test Environment:** Our benchmark results were obtained on MacBook Pro M1 Max (64GB RAM) using the Metal backend.
 
 ### Build
 
@@ -82,16 +136,22 @@ cargo run --release -- test embedding-gemma --backend mistralrs --quantization q
 Configure which models to benchmark:
 
 ```toml
-# FastEmbed (ONNX/CPU)
+# FastEmbed (ONNX/CPU) - works on all platforms
 [[fastembed]]
 model = "BAAI/bge-small-en-v1.5"
 
-# MistralRS (Metal GPU)
+# MistralRS with GPU acceleration
 [[mistralrs]]
 model = "embedding-gemma"
 quantization = "q8"    # none, q8, q4k
-device = "metal"       # metal, cpu
+device = "metal"       # "metal" (macOS), "cuda" (NVIDIA), "cpu"
 ```
+
+**Available MistralRS models:**
+- `embedding-gemma` - Google's Embedding Gemma 300M (768 dims, ~0.6GB)
+- `qwen3-0.6b` - Alibaba Qwen3 Embedding 0.6B (1024 dims, ~1.2GB)
+- `qwen3-4b` - Alibaba Qwen3 Embedding 4B (2560 dims, ~8GB)
+- `qwen3-8b` - Alibaba Qwen3 Embedding 8B (4096 dims, ~16GB)
 
 ### Chunking Strategies
 
@@ -268,8 +328,8 @@ We evaluate at two granularity levels:
 
 ## Disclaimers
 
-- **Hardware-specific results**: Benchmark results were obtained on Apple Silicon (M-series). Performance will vary on different hardware.
-- **Model availability**: Some models require downloading from Hugging Face. Ensure you have sufficient disk space and network access.
+- **Hardware-specific results**: Benchmark results were obtained on Apple Silicon M1 Max with Metal backend. Performance (throughput, memory usage) will differ on NVIDIA GPUs with CUDA or CPU-only configurations. Quality metrics (nDCG, MRR) should be consistent across platforms.
+- **Model availability**: Models are downloaded from Hugging Face on first run. Ensure sufficient disk space (~1-16GB depending on model) and network access.
 - **Not production-ready**: This is a benchmarking tool for research purposes. The embedding backends and chunking strategies are not optimized for production use.
 - **Query bias**: Benchmark quality depends heavily on query design. Results may not generalize to different query styles or codebases.
 - **Quantization trade-offs**: While Q8/Q4K quantization showed minimal quality loss in our tests, this may vary for other use cases.
