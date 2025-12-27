@@ -41,9 +41,24 @@ pub struct BoundedChunkerConfig {
 
 impl Default for BoundedChunkerConfig {
     fn default() -> Self {
+        // Reduced defaults based on research: 1000-1200 chars (~250-300 tokens)
+        // yields better retrieval performance than larger chunks
         Self {
-            max_tokens: 512,
-            target_tokens: 400,
+            max_tokens: 350,     // ~1400 chars
+            target_tokens: 280,  // ~1120 chars (80% of max)
+            overlap_ratio: 0.15,
+            inject_context: false,
+        }
+    }
+}
+
+impl BoundedChunkerConfig {
+    /// Create a small chunk configuration optimized for retrieval
+    /// Based on research showing 200-500 tokens is optimal
+    pub fn small() -> Self {
+        Self {
+            max_tokens: 350,
+            target_tokens: 280,
             overlap_ratio: 0.15,
             inject_context: false,
         }
@@ -266,6 +281,103 @@ impl BoundedSemanticChunker {
     /// Chunk with position tracking (alias for chunk, positions always tracked)
     pub fn chunk_with_positions(&self, content: &str, language: &str) -> Vec<BoundedChunk> {
         self.chunk(content, language)
+    }
+
+    /// Chunk with minimal file path context injection
+    ///
+    /// When `inject_context` is enabled, adds a comment with the file path
+    /// at the start of each chunk. This provides minimal context without
+    /// the overhead of full breadcrumb injection.
+    ///
+    /// Example output:
+    /// ```text
+    /// // src/auth.rs
+    /// fn login() { ... }
+    /// ```
+    pub fn chunk_with_file_context(
+        &self,
+        content: &str,
+        language: &str,
+        file_path: &str,
+    ) -> Vec<BoundedChunk> {
+        let chunks = self.chunk(content, language);
+
+        if !self.config.inject_context {
+            // Context injection disabled, return pure code chunks
+            return chunks
+                .into_iter()
+                .map(|c| {
+                    c.with_metadata(ChunkMetadata {
+                        file_path: file_path.to_string(),
+                        function_context: None,
+                        class_context: None,
+                        node_type: None,
+                    })
+                })
+                .collect();
+        }
+
+        // Add file path comment to each chunk
+        let comment_prefix = Self::get_comment_prefix(language);
+        let context_line = format!("{} {}\n", comment_prefix, file_path);
+        let context_tokens = self.count_tokens(&context_line);
+
+        chunks
+            .into_iter()
+            .map(|mut chunk| {
+                // Check if adding context would exceed max
+                let chunk_tokens = self.count_tokens(&chunk.content);
+                if chunk_tokens + context_tokens <= self.config.max_tokens {
+                    // Safe to add context
+                    chunk.content = format!("{}{}", context_line, chunk.content);
+                } else {
+                    // Need to trim chunk to make room for context
+                    let available_tokens = self.config.max_tokens.saturating_sub(context_tokens);
+                    let trimmed_content = self.trim_to_tokens(&chunk.content, available_tokens);
+                    chunk.content = format!("{}{}", context_line, trimmed_content);
+                }
+
+                chunk.with_metadata(ChunkMetadata {
+                    file_path: file_path.to_string(),
+                    function_context: None,
+                    class_context: None,
+                    node_type: None,
+                })
+            })
+            .collect()
+    }
+
+    /// Get the comment prefix for a language
+    fn get_comment_prefix(language: &str) -> &'static str {
+        match language {
+            "python" | "py" | "ruby" | "rb" | "shell" | "bash" | "sh" | "yaml" | "yml" | "toml" => "#",
+            "html" | "xml" => "<!--",
+            "css" => "/*",
+            _ => "//", // Rust, JavaScript, TypeScript, Go, Java, C, C++, etc.
+        }
+    }
+
+    /// Trim content to fit within token limit
+    fn trim_to_tokens(&self, content: &str, max_tokens: usize) -> String {
+        if self.count_tokens(content) <= max_tokens {
+            return content.to_string();
+        }
+
+        // Trim line by line from the end
+        let lines: Vec<&str> = content.lines().collect();
+        let mut result_lines = Vec::new();
+        let mut total_tokens = 0;
+
+        for line in lines {
+            let line_tokens = self.count_tokens(line);
+            if total_tokens + line_tokens > max_tokens {
+                break;
+            }
+            result_lines.push(line);
+            total_tokens += line_tokens;
+        }
+
+        result_lines.join("\n")
     }
 
     // ========================================================================
@@ -729,16 +841,31 @@ impl BoundedSemanticChunker {
         let mut current_tokens = 0;
         let mut language = String::new();
 
+        // Track overlap content from previous chunk for sibling overlap
+        let mut overlap_content: Option<String> = None;
+
         for chunk in chunks {
             let chunk_tokens = self.count_tokens(&chunk.content);
 
             if current_content.is_empty() {
-                current_content = chunk.content;
+                // Starting a new chunk - prepend overlap from previous if available
+                if let Some(ref overlap) = overlap_content {
+                    let overlap_tokens = self.count_tokens(overlap);
+                    if overlap_tokens + chunk_tokens <= self.config.max_tokens {
+                        current_content = format!("{}\n{}", overlap, chunk.content);
+                        current_tokens = overlap_tokens + chunk_tokens;
+                    } else {
+                        current_content = chunk.content;
+                        current_tokens = chunk_tokens;
+                    }
+                } else {
+                    current_content = chunk.content;
+                    current_tokens = chunk_tokens;
+                }
                 current_start_line = chunk.start_line;
                 current_end_line = chunk.end_line;
                 current_start_byte = chunk.start_byte;
                 current_end_byte = chunk.end_byte;
-                current_tokens = chunk_tokens;
                 language = chunk.language;
                 continue;
             }
@@ -753,6 +880,9 @@ impl BoundedSemanticChunker {
                 current_tokens += chunk_tokens;
             } else {
                 // Flush current and start new
+                // Calculate overlap for next chunk (15% of current chunk)
+                overlap_content = self.extract_overlap_content(&current_content);
+
                 merged.push(BoundedChunk::new(
                     current_content,
                     &language,
@@ -762,12 +892,24 @@ impl BoundedSemanticChunker {
                     current_end_byte,
                 ));
 
-                current_content = chunk.content;
+                // Start new chunk with overlap from previous
+                if let Some(ref overlap) = overlap_content {
+                    let overlap_tokens = self.count_tokens(overlap);
+                    if overlap_tokens + chunk_tokens <= self.config.max_tokens {
+                        current_content = format!("{}\n{}", overlap, chunk.content);
+                        current_tokens = overlap_tokens + chunk_tokens;
+                    } else {
+                        current_content = chunk.content;
+                        current_tokens = chunk_tokens;
+                    }
+                } else {
+                    current_content = chunk.content;
+                    current_tokens = chunk_tokens;
+                }
                 current_start_line = chunk.start_line;
                 current_end_line = chunk.end_line;
                 current_start_byte = chunk.start_byte;
                 current_end_byte = chunk.end_byte;
-                current_tokens = chunk_tokens;
                 language = chunk.language;
             }
         }
@@ -785,6 +927,41 @@ impl BoundedSemanticChunker {
         }
 
         merged
+    }
+
+    /// Extract overlap content from the end of a chunk (based on overlap_ratio)
+    fn extract_overlap_content(&self, content: &str) -> Option<String> {
+        if self.config.overlap_ratio <= 0.0 {
+            return None;
+        }
+
+        let total_tokens = self.count_tokens(content);
+        let overlap_tokens = (total_tokens as f32 * self.config.overlap_ratio) as usize;
+
+        if overlap_tokens == 0 {
+            return None;
+        }
+
+        // Get last N lines that fit within overlap_tokens
+        let lines: Vec<&str> = content.lines().collect();
+        let mut overlap_lines = Vec::new();
+        let mut collected_tokens = 0;
+
+        for line in lines.iter().rev() {
+            let line_tokens = self.count_tokens(line);
+            if collected_tokens + line_tokens > overlap_tokens {
+                break;
+            }
+            overlap_lines.push(*line);
+            collected_tokens += line_tokens;
+        }
+
+        if overlap_lines.is_empty() {
+            return None;
+        }
+
+        overlap_lines.reverse();
+        Some(overlap_lines.join("\n"))
     }
 
     // ========================================================================
@@ -997,8 +1174,9 @@ mod tests {
     #[test]
     fn config_default_is_sensible() {
         let config = BoundedChunkerConfig::default();
-        assert_eq!(config.max_tokens, 512);
-        assert_eq!(config.target_tokens, 400);
+        // Reduced defaults: 350 max, 280 target (research-backed)
+        assert_eq!(config.max_tokens, 350);
+        assert_eq!(config.target_tokens, 280);
         assert!((config.overlap_ratio - 0.15).abs() < 0.001);
         assert!(!config.inject_context);
     }

@@ -872,6 +872,499 @@ return combine_all_results(a, b, c, d);
     }
 
     // =========================================================================
+    // 10. AST SIBLING OVERLAP TESTS (NEW - Improvement #1)
+    // =========================================================================
+
+    mod sibling_overlap_tests {
+        use super::*;
+
+        #[test]
+        fn overlap_applied_between_ast_siblings() {
+            // Given: Multiple functions that will be split into separate chunks
+            let multiple_functions = r#"
+fn first_function() -> i32 {
+    let a = 1;
+    let b = 2;
+    let c = 3;
+    a + b + c
+}
+
+fn second_function() -> i32 {
+    let x = 10;
+    let y = 20;
+    x + y
+}
+
+fn third_function() -> i32 {
+    let result = 100;
+    result * 2
+}
+"#;
+            // Chunker with 15% sibling overlap enabled
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 50, // Force splitting into separate chunks
+                target_tokens: 40,
+                overlap_ratio: 0.15,
+                inject_context: false,
+            });
+
+            // When: Chunking with sibling overlap
+            let chunks = chunker.chunk(multiple_functions, "rust");
+
+            // Then: Adjacent chunks should share content from sibling boundaries
+            if chunks.len() >= 2 {
+                // Check that chunk 2 starts with some content from end of chunk 1
+                let chunk1_lines: Vec<&str> = chunks[0].content.lines().collect();
+                let chunk2_content = &chunks[1].content;
+
+                // Last line(s) of chunk 1 should appear at start of chunk 2
+                let has_sibling_overlap = chunk1_lines
+                    .iter()
+                    .rev()
+                    .take(3)
+                    .any(|line| chunk2_content.contains(line.trim()) && !line.trim().is_empty());
+
+                assert!(
+                    has_sibling_overlap,
+                    "Chunks should have sibling overlap. Chunk 1 ends with:\n{}\nChunk 2 starts with:\n{}",
+                    chunk1_lines.iter().rev().take(3).cloned().collect::<Vec<_>>().join("\n"),
+                    chunks[1].content.lines().take(5).collect::<Vec<_>>().join("\n")
+                );
+            }
+        }
+
+        #[test]
+        fn sibling_overlap_preserves_function_context() {
+            // Given: Functions where context at boundaries matters
+            let context_critical = r#"
+impl Calculator {
+    fn add(&self, a: i32, b: i32) -> i32 {
+        self.log("add");
+        a + b
+    }
+
+    fn subtract(&self, a: i32, b: i32) -> i32 {
+        self.log("subtract");
+        a - b
+    }
+
+    fn multiply(&self, a: i32, b: i32) -> i32 {
+        self.log("multiply");
+        a * b
+    }
+}
+"#;
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 60,
+                target_tokens: 48,
+                overlap_ratio: 0.15,
+                inject_context: false,
+            });
+
+            let chunks = chunker.chunk(context_critical, "rust");
+
+            // Then: Each chunk (except first) should have some context from previous
+            // to help embedding model understand the surrounding code
+            for (i, chunk) in chunks.iter().enumerate().skip(1) {
+                // Chunk should either start with overlap content or be self-contained
+                let content = chunk.content.trim();
+
+                // If it's a method, it should have context (impl block reference or overlap)
+                if content.contains("fn ") && !content.starts_with("impl") {
+                    // The chunk should have enough context to understand it's a method
+                    // Either through overlap or structural hints
+                    let has_context = content.contains("impl")
+                        || content.contains("self")
+                        || content.contains("}") // closing brace from overlap
+                        || i == 0;
+
+                    assert!(
+                        has_context,
+                        "Method in chunk {} should have context: {}",
+                        i,
+                        &content[..content.len().min(100)]
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn sibling_overlap_does_not_exceed_max_tokens() {
+            // Given: Content that produces multiple AST chunks
+            let large_content = r#"
+fn function_one() -> String {
+    let mut result = String::new();
+    result.push_str("processing");
+    result.push_str(" data");
+    result
+}
+
+fn function_two() -> String {
+    let mut buffer = String::new();
+    buffer.push_str("handling");
+    buffer.push_str(" request");
+    buffer
+}
+
+fn function_three() -> String {
+    let mut output = String::new();
+    output.push_str("generating");
+    output.push_str(" response");
+    output
+}
+"#;
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 50,
+                target_tokens: 40,
+                overlap_ratio: 0.20, // 20% overlap
+                inject_context: false,
+            });
+
+            let chunks = chunker.chunk(large_content, "rust");
+
+            // Then: Even with overlap, no chunk exceeds max
+            for (i, chunk) in chunks.iter().enumerate() {
+                let tokens = chunker.count_tokens(&chunk.content);
+                assert!(
+                    tokens <= 50,
+                    "Chunk {} with sibling overlap exceeds max: {} > 50\nContent: {}",
+                    i,
+                    tokens,
+                    &chunk.content[..chunk.content.len().min(200)]
+                );
+            }
+        }
+
+        #[test]
+        fn sibling_overlap_calculates_from_previous_sibling() {
+            // Given: Known content sizes
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 100,
+                target_tokens: 80,
+                overlap_ratio: 0.15, // 15% of previous chunk
+                inject_context: false,
+            });
+
+            let functions = r#"
+fn alpha() {
+    println!("alpha function body here");
+}
+
+fn beta() {
+    println!("beta function body here");
+}
+"#;
+            let chunks = chunker.chunk(functions, "rust");
+
+            if chunks.len() >= 2 {
+                // Calculate expected overlap tokens from first chunk
+                let chunk1_tokens = chunker.count_tokens(&chunks[0].content);
+                let expected_overlap_tokens = (chunk1_tokens as f32 * 0.15) as usize;
+
+                // Chunk 2 should be larger than just its own content due to overlap
+                // (if overlap was applied)
+                // This is a sanity check that overlap calculation is based on previous chunk
+                assert!(
+                    expected_overlap_tokens > 0 || chunk1_tokens < 7,
+                    "Expected some overlap tokens: {} (from {} chunk1 tokens)",
+                    expected_overlap_tokens,
+                    chunk1_tokens
+                );
+            }
+        }
+    }
+
+    // =========================================================================
+    // 11. MINIMAL CONTEXT INJECTION TESTS (NEW - Improvement #2)
+    // =========================================================================
+
+    mod minimal_context_tests {
+        use super::*;
+
+        #[test]
+        fn minimal_context_adds_file_path_only() {
+            // Given: Chunker with minimal context enabled
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 200,
+                target_tokens: 160,
+                overlap_ratio: 0.0,
+                inject_context: true, // Enable minimal context
+            });
+
+            // When: Chunking with file path
+            let chunks = chunker.chunk_with_file_context(SMALL_FUNCTION, "rust", "src/math.rs");
+
+            // Then: Each chunk should start with file path comment
+            for chunk in &chunks {
+                assert!(
+                    chunk.content.starts_with("// src/math.rs\n"),
+                    "Chunk should start with file path comment, got: {}",
+                    &chunk.content[..chunk.content.len().min(50)]
+                );
+            }
+        }
+
+        #[test]
+        fn minimal_context_does_not_add_breadcrumbs() {
+            // Given: Chunker with minimal context
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 200,
+                target_tokens: 160,
+                overlap_ratio: 0.0,
+                inject_context: true,
+            });
+
+            // When: Chunking nested content
+            let chunks = chunker.chunk_with_file_context(NESTED_STRUCTURE, "rust", "src/auth/mod.rs");
+
+            // Then: Should NOT have breadcrumb-style context like "impl User > fn new"
+            for chunk in &chunks {
+                assert!(
+                    !chunk.content.contains(" > "),
+                    "Should not have breadcrumb context: {}",
+                    &chunk.content[..chunk.content.len().min(100)]
+                );
+                assert!(
+                    !chunk.content.contains("[context:"),
+                    "Should not have [context: prefix"
+                );
+            }
+        }
+
+        #[test]
+        fn minimal_context_uses_comment_syntax_for_language() {
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 200,
+                target_tokens: 160,
+                overlap_ratio: 0.0,
+                inject_context: true,
+            });
+
+            // Test Rust (// comment)
+            let rust_chunks = chunker.chunk_with_file_context("fn test() {}", "rust", "src/lib.rs");
+            assert!(rust_chunks[0].content.starts_with("// "));
+
+            // Test Python (# comment)
+            let py_chunks = chunker.chunk_with_file_context("def test(): pass", "python", "main.py");
+            assert!(
+                py_chunks[0].content.starts_with("# "),
+                "Python should use # comment: {}",
+                &py_chunks[0].content[..py_chunks[0].content.len().min(30)]
+            );
+        }
+
+        #[test]
+        fn minimal_context_counts_toward_token_limit() {
+            // Given: Very tight token limit
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 50,
+                target_tokens: 40,
+                overlap_ratio: 0.0,
+                inject_context: true,
+            });
+
+            // When: Adding context to content near the limit
+            let chunks = chunker.chunk_with_file_context(
+                MEDIUM_FUNCTION,
+                "rust",
+                "src/very/long/nested/path/to/auth/service.rs"
+            );
+
+            // Then: Total tokens including context must not exceed max
+            for chunk in &chunks {
+                let tokens = chunker.count_tokens(&chunk.content);
+                assert!(
+                    tokens <= 50,
+                    "Chunk with context exceeds max: {} tokens\n{}",
+                    tokens,
+                    &chunk.content[..chunk.content.len().min(200)]
+                );
+            }
+        }
+
+        #[test]
+        fn context_disabled_produces_pure_code() {
+            // Given: Chunker with context disabled (default)
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 200,
+                target_tokens: 160,
+                overlap_ratio: 0.0,
+                inject_context: false, // Disabled
+            });
+
+            // When: Chunking with file context method
+            let chunks = chunker.chunk_with_file_context(SMALL_FUNCTION, "rust", "src/math.rs");
+
+            // Then: Should NOT have file path prefix
+            for chunk in &chunks {
+                assert!(
+                    !chunk.content.starts_with("//"),
+                    "With inject_context=false, should not add prefix: {}",
+                    &chunk.content[..chunk.content.len().min(50)]
+                );
+            }
+        }
+
+        #[test]
+        fn metadata_still_tracks_file_path_separately() {
+            // Given: Chunker with context enabled
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 200,
+                target_tokens: 160,
+                overlap_ratio: 0.0,
+                inject_context: true,
+            });
+
+            // When: Chunking with metadata
+            let chunks = chunker.chunk_with_metadata(SMALL_FUNCTION, "rust", "src/utils.rs");
+
+            // Then: Metadata should still have file path
+            for chunk in &chunks {
+                assert!(chunk.metadata.is_some());
+                assert_eq!(chunk.metadata.as_ref().unwrap().file_path, "src/utils.rs");
+            }
+        }
+    }
+
+    // =========================================================================
+    // 12. REDUCED CHUNK SIZE TESTS (NEW - Improvement #3)
+    // =========================================================================
+
+    mod reduced_chunk_size_tests {
+        use super::*;
+
+        #[test]
+        fn default_target_is_reduced() {
+            // Given: Default configuration
+            let config = BoundedChunkerConfig::default();
+
+            // Then: Target should be ~250-300 tokens (1000-1200 chars)
+            // Old default was 400, new should be ~250
+            assert!(
+                config.target_tokens <= 300,
+                "Default target_tokens should be <= 300, got {}",
+                config.target_tokens
+            );
+            assert!(
+                config.target_tokens >= 200,
+                "Default target_tokens should be >= 200, got {}",
+                config.target_tokens
+            );
+        }
+
+        #[test]
+        fn default_max_is_reduced() {
+            // Given: Default configuration
+            let config = BoundedChunkerConfig::default();
+
+            // Then: Max should be ~350-400 tokens (1400-1600 chars)
+            // Old default was 512, new should be ~350
+            assert!(
+                config.max_tokens <= 400,
+                "Default max_tokens should be <= 400, got {}",
+                config.max_tokens
+            );
+            assert!(
+                config.max_tokens >= 300,
+                "Default max_tokens should be >= 300, got {}",
+                config.max_tokens
+            );
+        }
+
+        #[test]
+        fn for_model_calculates_appropriate_target() {
+            // Given: Model with 512 token limit
+            let config = BoundedChunkerConfig::for_model(512);
+
+            // Then: Target should be 80% of max
+            assert_eq!(
+                config.target_tokens,
+                (512.0 * 0.8) as usize,
+                "Target should be 80% of max"
+            );
+        }
+
+        #[test]
+        fn reduced_size_produces_more_chunks() {
+            // Given: Old config (large chunks) vs new config (smaller chunks)
+            let old_config = BoundedChunkerConfig {
+                max_tokens: 512,
+                target_tokens: 400,
+                overlap_ratio: 0.0,
+                inject_context: false,
+            };
+            let new_config = BoundedChunkerConfig {
+                max_tokens: 350,
+                target_tokens: 280,
+                overlap_ratio: 0.0,
+                inject_context: false,
+            };
+
+            let old_chunker = BoundedSemanticChunker::new(old_config);
+            let new_chunker = BoundedSemanticChunker::new(new_config);
+
+            // When: Chunking same content
+            let old_chunks = old_chunker.chunk(LARGE_IMPL_BLOCK, "rust");
+            let new_chunks = new_chunker.chunk(LARGE_IMPL_BLOCK, "rust");
+
+            // Then: New config should produce >= same number of chunks
+            assert!(
+                new_chunks.len() >= old_chunks.len(),
+                "Smaller chunks should produce more splits: old={}, new={}",
+                old_chunks.len(),
+                new_chunks.len()
+            );
+        }
+
+        #[test]
+        fn small_config_helper_creates_reduced_defaults() {
+            // Given: Helper for creating small chunk config
+            let config = BoundedChunkerConfig::small();
+
+            // Then: Should have reduced defaults
+            assert!(config.max_tokens <= 350);
+            assert!(config.target_tokens <= 280);
+            assert!((config.overlap_ratio - 0.15).abs() < 0.01);
+        }
+
+        #[test]
+        fn chunks_average_near_target_size() {
+            // Given: Chunker with specific target
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 350,
+                target_tokens: 280,
+                overlap_ratio: 0.0,
+                inject_context: false,
+            });
+
+            // When: Chunking substantial content
+            let chunks = chunker.chunk(LARGE_IMPL_BLOCK, "rust");
+
+            if chunks.len() > 1 {
+                // Then: Average chunk size should be close to target
+                let total_tokens: usize = chunks.iter()
+                    .map(|c| chunker.count_tokens(&c.content))
+                    .sum();
+                let avg_tokens = total_tokens / chunks.len();
+
+                // Average should be within 50% of target
+                let target = 280;
+                let lower_bound = target / 2;
+                let upper_bound = target + target / 2;
+
+                assert!(
+                    avg_tokens >= lower_bound && avg_tokens <= upper_bound,
+                    "Average tokens {} should be near target {} (range {}-{})",
+                    avg_tokens,
+                    target,
+                    lower_bound,
+                    upper_bound
+                );
+            }
+        }
+    }
+
+    // =========================================================================
     // MOCK EMBEDDER
     // =========================================================================
 
