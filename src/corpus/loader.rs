@@ -20,8 +20,9 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::path::Path;
 
+use super::bounded_chunker::{BoundedChunkerConfig, BoundedSemanticChunker};
 use super::chunker::DEFAULT_MAX_CHARS;
-use super::semantic_chunker::{AstSemanticChunker, HeaderSemanticChunker};
+use super::semantic_chunker::HeaderSemanticChunker;
 use crate::config::Strategy;
 
 /// A chunk of text for embedding
@@ -177,9 +178,10 @@ pub struct CorpusConfig {
     pub max_chunk_chars: usize,
 
     /// Context budget for semantic chunking (chars reserved for context injection)
+    /// NOTE: Set to 0 for BoundedSemanticChunker (no context injection)
     pub context_budget: usize,
 
-    /// Overlap ratio (0.0 to 0.5) for line-based chunking
+    /// Overlap ratio (0.0 to 0.5) for chunking
     pub overlap: f32,
 
     /// Minimum characters for a valid chunk
@@ -187,6 +189,10 @@ pub struct CorpusConfig {
 
     /// Patterns to skip (substrings in path)
     pub skip_patterns: Vec<String>,
+
+    /// Maximum tokens per chunk (for embedding model limits)
+    /// Used by BoundedSemanticChunker to enforce hard limits
+    pub max_tokens: usize,
 }
 
 impl Default for CorpusConfig {
@@ -201,8 +207,8 @@ impl Default for CorpusConfig {
             code_chunk_lines: 50,
             doc_chunk_lines: 100,
             max_chunk_chars: DEFAULT_MAX_CHARS,
-            context_budget: 400, // Context budget for semantic chunking
-            overlap: 0.25,
+            context_budget: 0, // No context injection (research: improves retrieval)
+            overlap: 0.15, // 15% overlap (industry standard)
             min_chunk_chars: 50,
             skip_patterns: vec![
                 "/target/".to_string(),
@@ -217,6 +223,7 @@ impl Default for CorpusConfig {
                 "/.eggs/".to_string(),
                 "/site-packages/".to_string(),
             ],
+            max_tokens: 512, // Default for most embedding models (BGE, etc.)
         }
     }
 }
@@ -258,8 +265,15 @@ impl CorpusConfig {
     }
 
     /// Set context budget for semantic chunking
+    /// NOTE: Set to 0 for best results (no context injection)
     pub fn with_context_budget(mut self, budget: usize) -> Self {
         self.context_budget = budget;
+        self
+    }
+
+    /// Set maximum tokens per chunk (for embedding model limits)
+    pub fn with_max_tokens(mut self, max_tokens: usize) -> Self {
+        self.max_tokens = max_tokens;
         self
     }
 
@@ -571,7 +585,7 @@ fn chunk_file_with_config(
     content_type: ContentType,
     config: &CorpusConfig,
 ) -> Vec<Chunk> {
-    let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    let file_path_str = file_path.to_string_lossy().to_string();
 
     match config.strategy {
         Strategy::Line => {
@@ -579,27 +593,46 @@ fn chunk_file_with_config(
             chunk_file_line_based(file_path, content, language, content_type, config)
         }
         Strategy::Semantic => {
-            // Semantic chunking with context preservation
+            // Use BoundedSemanticChunker for code (research-based improvements)
+            // - No context injection (pure code)
+            // - Hard token limit enforcement
+            // - Configurable overlap
+            // - AST-aware splitting with fallback chain
             match content_type {
                 ContentType::Code => {
-                    // Use AstSemanticChunker for code
-                    let chunker = AstSemanticChunker::new(
-                        config.max_chunk_chars,
-                        config.context_budget,
-                    );
-                    let chunks = chunker.create_chunks(file_path, content, language, ext);
-                    if !chunks.is_empty() {
-                        return chunks;
+                    let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                        max_tokens: config.max_tokens,
+                        target_tokens: (config.max_tokens as f32 * 0.8) as usize,
+                        overlap_ratio: config.overlap,
+                        inject_context: false, // No context injection (research finding)
+                    });
+
+                    let bounded_chunks = chunker.chunk(content, language);
+
+                    if bounded_chunks.is_empty() {
+                        // Fall back to line-based if AST/semantic fails
+                        tracing::debug!(
+                            "BoundedSemanticChunker returned empty for {}, falling back to line-based",
+                            file_path.display()
+                        );
+                        return chunk_file_line_based(file_path, content, language, content_type, config);
                     }
-                    // Fall back to line-based if AST fails
-                    tracing::debug!(
-                        "AstSemanticChunker returned empty for {}, falling back to line-based",
-                        file_path.display()
-                    );
-                    chunk_file_line_based(file_path, content, language, content_type, config)
+
+                    // Convert BoundedChunk to Chunk
+                    bounded_chunks
+                        .into_iter()
+                        .map(|bc| Chunk::new(
+                            &file_path_str,
+                            bc.content,
+                            language,
+                            bc.start_line,
+                            bc.end_line,
+                            content_type,
+                        ))
+                        .collect()
                 }
                 ContentType::Document => {
-                    // Use HeaderSemanticChunker for docs
+                    // Use HeaderSemanticChunker for docs (header-based splitting)
                     if language == "markdown" || language == "rst" {
                         let chunker = HeaderSemanticChunker::new(
                             config.max_chunk_chars,

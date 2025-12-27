@@ -141,9 +141,14 @@ enum Commands {
         #[arg(long, default_value = "60")]
         doc_lines: usize,
 
-        /// Chunk overlap ratio (0.0 to 0.5, for line-based strategy)
-        #[arg(long, default_value = "0.25")]
+        /// Chunk overlap ratio (0.0 to 0.5)
+        #[arg(long, default_value = "0.15")]
         overlap: f32,
+
+        /// Maximum tokens per chunk (for embedding model limits)
+        /// If not specified, uses minimum from configured models (default: 512)
+        #[arg(long)]
+        max_tokens: Option<usize>,
 
         /// Additional skip patterns (comma-separated path substrings)
         #[arg(long, value_delimiter = ',')]
@@ -202,6 +207,7 @@ async fn main() -> Result<()> {
             code_lines,
             doc_lines,
             overlap,
+            max_tokens,
             skip,
         } => {
             run_benchmark(
@@ -218,6 +224,7 @@ async fn main() -> Result<()> {
                 code_lines,
                 doc_lines,
                 overlap,
+                max_tokens,
                 skip,
             )
             .await?;
@@ -258,6 +265,7 @@ async fn run_benchmark(
     code_lines: usize,
     doc_lines: usize,
     overlap: f32,
+    max_tokens: Option<usize>,
     skip_patterns: Option<Vec<String>>,
 ) -> Result<()> {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -292,6 +300,27 @@ async fn run_benchmark(
         query_file.metadata.name
     );
 
+    // Determine max_tokens for chunking
+    // Priority: CLI arg > minimum from models config > default (512)
+    let effective_max_tokens = max_tokens.unwrap_or_else(|| {
+        // Find minimum max_tokens from all configured models
+        let fastembed_min = models_config
+            .fastembed
+            .iter()
+            .filter_map(|m| m.max_tokens)
+            .min()
+            .unwrap_or(512);
+        // MistralRS models typically have 512 token limit for BGE-style models
+        let mistralrs_min = if models_config.mistralrs.is_empty() {
+            usize::MAX
+        } else {
+            512 // Default for embedding models
+        };
+        fastembed_min.min(mistralrs_min)
+    });
+
+    eprintln!("  Max tokens per chunk: {}", effective_max_tokens);
+
     // Build corpus config
     let mut config = CorpusConfig::new()
         .with_strategy(strategy)
@@ -299,7 +328,8 @@ async fn run_benchmark(
         .with_context_budget(context_budget)
         .with_code_chunk_lines(code_lines)
         .with_doc_chunk_lines(doc_lines)
-        .with_overlap(overlap);
+        .with_overlap(overlap)
+        .with_max_tokens(effective_max_tokens);
 
     if let Some(exts) = extensions {
         let ext_refs: Vec<&str> = exts.iter().map(|s| s.as_str()).collect();
