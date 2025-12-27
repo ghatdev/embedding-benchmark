@@ -1,0 +1,7 @@
+# Test config: Single model for line vs semantic comparison
+# Using embedding-gemma with Q4K quantization (fastest)
+
+[[mistralrs]]
+model = "embedding-gemma"
+quantization = "q4k"
+device = "metal"
