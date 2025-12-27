@@ -1,0 +1,5 @@
+# MistralRS EmbeddingGemma only
+[[mistralrs]]
+model = "embedding-gemma"
+quantization = "q8"
+device = "metal"

@@ -28,6 +28,10 @@
 pub mod loader;
 pub mod chunker;
 pub mod semantic_chunker;
+pub mod bounded_chunker;
+
+#[cfg(test)]
+mod bounded_chunker_tests;
 
 // Chunking constants
 
