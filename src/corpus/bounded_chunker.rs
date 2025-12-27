@@ -43,10 +43,11 @@ impl Default for BoundedChunkerConfig {
     fn default() -> Self {
         // Reduced defaults based on research: 1000-1200 chars (~250-300 tokens)
         // yields better retrieval performance than larger chunks
+        // 25% overlap matches line chunker for fair comparison
         Self {
             max_tokens: 350,     // ~1400 chars
             target_tokens: 280,  // ~1120 chars (80% of max)
-            overlap_ratio: 0.15,
+            overlap_ratio: 0.25, // Match line chunker's 25% overlap
             inject_context: false,
         }
     }
@@ -59,7 +60,18 @@ impl BoundedChunkerConfig {
         Self {
             max_tokens: 350,
             target_tokens: 280,
-            overlap_ratio: 0.15,
+            overlap_ratio: 0.25,
+            inject_context: false,
+        }
+    }
+
+    /// Create an aggressive configuration for maximum chunk count
+    /// Produces more, smaller chunks with high overlap - closest to line chunker behavior
+    pub fn aggressive() -> Self {
+        Self {
+            max_tokens: 200,     // ~800 chars - force more splitting
+            target_tokens: 160,  // ~640 chars (80% of max)
+            overlap_ratio: 0.25, // Match line chunker
             inject_context: false,
         }
     }
@@ -71,7 +83,7 @@ impl BoundedChunkerConfig {
         Self {
             max_tokens: model_max_tokens,
             target_tokens: (model_max_tokens as f32 * 0.8) as usize,
-            overlap_ratio: 0.15,
+            overlap_ratio: 0.25, // Match line chunker
             inject_context: false,
         }
     }
@@ -1174,10 +1186,10 @@ mod tests {
     #[test]
     fn config_default_is_sensible() {
         let config = BoundedChunkerConfig::default();
-        // Reduced defaults: 350 max, 280 target (research-backed)
+        // Reduced defaults: 350 max, 280 target, 25% overlap (match line chunker)
         assert_eq!(config.max_tokens, 350);
         assert_eq!(config.target_tokens, 280);
-        assert!((config.overlap_ratio - 0.15).abs() < 0.001);
+        assert!((config.overlap_ratio - 0.25).abs() < 0.001);
         assert!(!config.inject_context);
     }
 

@@ -301,7 +301,7 @@ async fn run_benchmark(
     );
 
     // Determine max_tokens for chunking
-    // Priority: CLI arg > minimum from models config > default (512)
+    // Priority: CLI arg > minimum from models config > default (350 for optimal retrieval)
     let effective_max_tokens = max_tokens.unwrap_or_else(|| {
         // Find minimum max_tokens from all configured models
         let fastembed_min = models_config
@@ -309,12 +309,12 @@ async fn run_benchmark(
             .iter()
             .filter_map(|m| m.max_tokens)
             .min()
-            .unwrap_or(512);
-        // MistralRS models typically have 512 token limit for BGE-style models
+            .unwrap_or(350); // Reduced default: research shows 200-500 tokens optimal
+        // MistralRS models: use 350 for better retrieval (smaller chunks = more coverage)
         let mistralrs_min = if models_config.mistralrs.is_empty() {
             usize::MAX
         } else {
-            512 // Default for embedding models
+            350 // Reduced for better retrieval performance
         };
         fastembed_min.min(mistralrs_min)
     });

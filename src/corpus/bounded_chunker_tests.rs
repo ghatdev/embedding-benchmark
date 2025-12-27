@@ -1321,10 +1321,10 @@ fn beta() {
             // Given: Helper for creating small chunk config
             let config = BoundedChunkerConfig::small();
 
-            // Then: Should have reduced defaults
+            // Then: Should have reduced defaults with 25% overlap
             assert!(config.max_tokens <= 350);
             assert!(config.target_tokens <= 280);
-            assert!((config.overlap_ratio - 0.15).abs() < 0.01);
+            assert!((config.overlap_ratio - 0.25).abs() < 0.01);
         }
 
         #[test]
@@ -1361,6 +1361,320 @@ fn beta() {
                     upper_bound
                 );
             }
+        }
+    }
+
+    // =========================================================================
+    // 13. AGGRESSIVE CHUNKING TESTS (NEW - Close the gap with line chunker)
+    // =========================================================================
+
+    mod aggressive_chunking_tests {
+        use super::*;
+
+        /// Large function that should be split even though it's a single AST node
+        const LARGE_FUNCTION: &str = r#"
+fn process_data(input: &str) -> Result<Output, Error> {
+    // Step 1: Parse the input
+    let parsed = parse_input(input)?;
+    let validated = validate_parsed(&parsed)?;
+
+    // Step 2: Transform the data
+    let transformed = transform_data(&validated);
+    let normalized = normalize_output(&transformed);
+
+    // Step 3: Apply business rules
+    let with_rules = apply_business_rules(&normalized);
+    let filtered = filter_invalid(&with_rules);
+
+    // Step 4: Format output
+    let formatted = format_output(&filtered);
+    let serialized = serialize_result(&formatted);
+
+    // Step 5: Validate output
+    let final_validated = validate_output(&serialized)?;
+
+    Ok(final_validated)
+}
+"#;
+
+        #[test]
+        fn default_overlap_is_25_percent() {
+            // Given: Default configuration (matching line chunker)
+            let config = BoundedChunkerConfig::default();
+
+            // Then: Overlap should be 25% to match line chunker
+            assert!(
+                (config.overlap_ratio - 0.25).abs() < 0.01,
+                "Default overlap should be 25%, got {}",
+                config.overlap_ratio
+            );
+        }
+
+        #[test]
+        fn aggressive_config_has_small_target() {
+            // Given: Aggressive configuration for maximum chunks
+            let config = BoundedChunkerConfig::aggressive();
+
+            // Then: Should have very small target (150-200 tokens)
+            assert!(
+                config.target_tokens <= 200,
+                "Aggressive target should be <= 200, got {}",
+                config.target_tokens
+            );
+            assert!(
+                config.max_tokens <= 250,
+                "Aggressive max should be <= 250, got {}",
+                config.max_tokens
+            );
+            assert!(
+                (config.overlap_ratio - 0.25).abs() < 0.01,
+                "Aggressive overlap should be 25%"
+            );
+        }
+
+        #[test]
+        fn forces_split_on_large_ast_nodes() {
+            // Given: Chunker with small target that forces splitting
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 100,
+                target_tokens: 80,
+                overlap_ratio: 0.25,
+                inject_context: false,
+            });
+
+            // When: Chunking a large single function
+            let chunks = chunker.chunk(LARGE_FUNCTION, "rust");
+
+            // Then: Should produce multiple chunks even though it's one function
+            assert!(
+                chunks.len() >= 2,
+                "Large function should be split into multiple chunks, got {}",
+                chunks.len()
+            );
+
+            // And: Each chunk should respect the limit
+            for chunk in &chunks {
+                let tokens = chunker.count_tokens(&chunk.content);
+                assert!(
+                    tokens <= 100,
+                    "Chunk exceeds max: {} tokens",
+                    tokens
+                );
+            }
+        }
+
+        #[test]
+        fn aggressive_produces_more_chunks_than_default() {
+            // Given: Default vs aggressive configs
+            let default_chunker = BoundedSemanticChunker::new(BoundedChunkerConfig::default());
+            let aggressive_chunker = BoundedSemanticChunker::new(BoundedChunkerConfig::aggressive());
+
+            // When: Chunking same content
+            let default_chunks = default_chunker.chunk(LARGE_IMPL_BLOCK, "rust");
+            let aggressive_chunks = aggressive_chunker.chunk(LARGE_IMPL_BLOCK, "rust");
+
+            // Then: Aggressive should produce significantly more chunks
+            assert!(
+                aggressive_chunks.len() > default_chunks.len(),
+                "Aggressive ({}) should produce more chunks than default ({})",
+                aggressive_chunks.len(),
+                default_chunks.len()
+            );
+        }
+
+        #[test]
+        fn overlap_content_is_substantial() {
+            // Given: Chunker with 25% overlap
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 100,
+                target_tokens: 80,
+                overlap_ratio: 0.25,
+                inject_context: false,
+            });
+
+            // When: Chunking content that produces multiple chunks
+            let chunks = chunker.chunk(LARGE_IMPL_BLOCK, "rust");
+
+            if chunks.len() >= 2 {
+                // Then: Check that overlap is actually present
+                for i in 1..chunks.len() {
+                    let prev_content = &chunks[i - 1].content;
+                    let curr_content = &chunks[i].content;
+
+                    // Get last few lines of previous chunk
+                    let prev_lines: Vec<&str> = prev_content.lines().collect();
+                    let overlap_check_lines = prev_lines.iter().rev().take(5);
+
+                    // At least one line should appear in current chunk
+                    let has_overlap = overlap_check_lines
+                        .filter(|line| !line.trim().is_empty())
+                        .any(|line| curr_content.contains(line.trim()));
+
+                    assert!(
+                        has_overlap,
+                        "Chunk {} should have overlap from chunk {}",
+                        i,
+                        i - 1
+                    );
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 14. FALLBACK LINE OVERLAP TESTS (For unsupported languages)
+    // =========================================================================
+
+    mod fallback_overlap_tests {
+        use super::*;
+
+        #[test]
+        fn unsupported_language_still_gets_overlap() {
+            // Given: Content in unsupported language with more content to ensure multiple chunks
+            let content = r#"
+First block of content here with some extra words
+that make this line longer for better testing results
+to ensure we have enough content for chunking properly.
+
+Second block of content here with additional words too
+also containing multiple lines for testing the overlap
+behavior in fallback mode and making sure it works correctly.
+
+Third block of content here to ensure we have enough
+material for multiple chunks with proper overlap applied
+and verified in this comprehensive test case scenario.
+
+Fourth block of content here for extra coverage
+making absolutely sure we have multiple chunks generated
+with overlap between each adjacent pair of chunks tested.
+"#;
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 50,  // Larger limit for clearer chunks
+                target_tokens: 40,
+                overlap_ratio: 0.25,
+                inject_context: false,
+            });
+
+            // When: Chunking unsupported language
+            let chunks = chunker.chunk(content, "unknown_lang");
+
+            // Then: Should still produce overlapping chunks
+            assert!(chunks.len() >= 2, "Should produce multiple chunks, got {}", chunks.len());
+
+            if chunks.len() >= 2 {
+                // Check for overlap: words from end of chunk1 should appear in chunk2
+                let chunk1_words: Vec<&str> = chunks[0].content.split_whitespace().collect();
+                let chunk2_content = &chunks[1].content;
+
+                // Get last 10 words of chunk 1
+                let last_words: Vec<&str> = chunk1_words.iter().rev().take(10).cloned().collect();
+
+                // At least one word should appear in chunk 2 (overlap)
+                let has_overlap = last_words
+                    .iter()
+                    .filter(|w| w.len() > 3) // Skip short words
+                    .any(|word| chunk2_content.contains(word));
+
+                assert!(
+                    has_overlap,
+                    "Fallback chunking should have overlap. Chunk1 ends: {:?}, Chunk2 starts: {}",
+                    &last_words[..last_words.len().min(5)],
+                    &chunks[1].content[..chunks[1].content.len().min(100)]
+                );
+            }
+        }
+
+        #[test]
+        fn line_fallback_respects_token_limit() {
+            // Given: Unsupported language with tight limit
+            let content = "word ".repeat(100);
+            let chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 20,
+                target_tokens: 16,
+                overlap_ratio: 0.25,
+                inject_context: false,
+            });
+
+            // When: Chunking
+            let chunks = chunker.chunk(&content, "brainfuck");
+
+            // Then: All chunks respect limit
+            for (i, chunk) in chunks.iter().enumerate() {
+                let tokens = chunker.count_tokens(&chunk.content);
+                assert!(
+                    tokens <= 20,
+                    "Fallback chunk {} exceeds limit: {} > 20",
+                    i,
+                    tokens
+                );
+            }
+        }
+    }
+
+    // =========================================================================
+    // 15. CHUNK COUNT PARITY TESTS (Match line chunker output)
+    // =========================================================================
+
+    mod chunk_count_parity_tests {
+        use super::*;
+
+        #[test]
+        fn aggressive_semantic_approaches_line_chunk_count() {
+            // Given: Content that line chunker would split extensively
+            let large_content = format!(
+                "{}\n\n{}\n\n{}\n\n{}",
+                LARGE_IMPL_BLOCK,
+                MEDIUM_FUNCTION,
+                NESTED_STRUCTURE,
+                LARGE_IMPL_BLOCK
+            );
+
+            // Simulate line chunker behavior: ~40 lines per chunk with 25% overlap
+            let line_count = large_content.lines().count();
+            let estimated_line_chunks = (line_count as f32 / (40.0 * 0.75)).ceil() as usize;
+
+            // Aggressive semantic chunker
+            let aggressive_chunker = BoundedSemanticChunker::new(BoundedChunkerConfig::aggressive());
+            let semantic_chunks = aggressive_chunker.chunk(&large_content, "rust");
+
+            // Then: Semantic should produce at least 60% as many chunks as line would
+            let min_expected = (estimated_line_chunks as f32 * 0.6) as usize;
+            assert!(
+                semantic_chunks.len() >= min_expected.max(1),
+                "Aggressive semantic ({}) should approach line chunker estimate ({}, min {})",
+                semantic_chunks.len(),
+                estimated_line_chunks,
+                min_expected
+            );
+        }
+
+        #[test]
+        fn more_chunks_means_better_coverage() {
+            // Given: Two configs with different chunk counts
+            let small_chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 100,
+                target_tokens: 80,
+                overlap_ratio: 0.25,
+                inject_context: false,
+            });
+            let large_chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                max_tokens: 300,
+                target_tokens: 240,
+                overlap_ratio: 0.25,
+                inject_context: false,
+            });
+
+            // When: Chunking
+            let small_chunks = small_chunker.chunk(LARGE_IMPL_BLOCK, "rust");
+            let large_chunks = large_chunker.chunk(LARGE_IMPL_BLOCK, "rust");
+
+            // Then: Small chunks should have more entries
+            assert!(
+                small_chunks.len() >= large_chunks.len(),
+                "Smaller target ({}) should produce >= chunks than larger ({})",
+                small_chunks.len(),
+                large_chunks.len()
+            );
         }
     }
 

@@ -208,7 +208,7 @@ impl Default for CorpusConfig {
             doc_chunk_lines: 100,
             max_chunk_chars: DEFAULT_MAX_CHARS,
             context_budget: 0, // No context injection (research: improves retrieval)
-            overlap: 0.15, // 15% overlap (industry standard)
+            overlap: 0.25, // 25% overlap (match line chunker for fair comparison)
             min_chunk_chars: 50,
             skip_patterns: vec![
                 "/target/".to_string(),
@@ -223,7 +223,7 @@ impl Default for CorpusConfig {
                 "/.eggs/".to_string(),
                 "/site-packages/".to_string(),
             ],
-            max_tokens: 512, // Default for most embedding models (BGE, etc.)
+            max_tokens: 350, // Reduced for more chunks (research: 200-500 tokens optimal)
         }
     }
 }
