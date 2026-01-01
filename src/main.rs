@@ -52,7 +52,7 @@ use benchmark::{
 };
 use benchmark::quality::FileResolutionWarning;
 use config::{ModelsConfig, Strategy};
-use corpus::{load_corpus_generic, CorpusConfig, ContentType};
+use corpus::{load_corpus_generic, CorpusConfig, ContentType, ContextFormat};
 use embedders::{EmbedderBackend, FastEmbedBackend, FastEmbedModel, MistralRsBackend, MistralRsDevice, MistralRsModel, MistralRsQuantization, ResourceMetrics};
 use queries::{QueryFile, BenchmarkQuery, QueryType};
 use resource_monitor::ResourceMonitor;
@@ -150,6 +150,14 @@ enum Commands {
         #[arg(long)]
         max_tokens: Option<usize>,
 
+        /// Inject file path context into chunks (for semantic strategy)
+        #[arg(long, default_value = "false")]
+        inject_context: bool,
+
+        /// Context format: none, comment, bracket, natural
+        #[arg(long, default_value = "none")]
+        context_format: String,
+
         /// Additional skip patterns (comma-separated path substrings)
         #[arg(long, value_delimiter = ',')]
         skip: Option<Vec<String>>,
@@ -208,6 +216,8 @@ async fn main() -> Result<()> {
             doc_lines,
             overlap,
             max_tokens,
+            inject_context,
+            context_format,
             skip,
         } => {
             run_benchmark(
@@ -225,6 +235,8 @@ async fn main() -> Result<()> {
                 doc_lines,
                 overlap,
                 max_tokens,
+                inject_context,
+                &context_format,
                 skip,
             )
             .await?;
@@ -250,6 +262,17 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+/// Parse context format from CLI string
+fn parse_context_format(s: &str) -> ContextFormat {
+    match s.to_lowercase().as_str() {
+        "comment" => ContextFormat::Comment,
+        "bracket" => ContextFormat::Bracket,
+        "natural" => ContextFormat::Natural,
+        "signature" | "sig" => ContextFormat::Signature,
+        _ => ContextFormat::None,
+    }
+}
+
 /// Run the benchmark with all models from config
 async fn run_benchmark(
     corpus_path: &PathBuf,
@@ -266,6 +289,8 @@ async fn run_benchmark(
     doc_lines: usize,
     overlap: f32,
     max_tokens: Option<usize>,
+    inject_context: bool,
+    context_format: &str,
     skip_patterns: Option<Vec<String>>,
 ) -> Result<()> {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -329,7 +354,9 @@ async fn run_benchmark(
         .with_code_chunk_lines(code_lines)
         .with_doc_chunk_lines(doc_lines)
         .with_overlap(overlap)
-        .with_max_tokens(effective_max_tokens);
+        .with_max_tokens(effective_max_tokens)
+        .with_inject_context(inject_context)
+        .with_context_format(parse_context_format(context_format));
 
     if let Some(exts) = extensions {
         let ext_refs: Vec<&str> = exts.iter().map(|s| s.as_str()).collect();

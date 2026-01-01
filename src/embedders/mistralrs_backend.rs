@@ -36,11 +36,24 @@ impl MistralRsModel {
 
     /// Format text as a query for embedding (with instruction prefix)
     /// This is crucial for models that are instruction-aware!
+    ///
+    /// Ablation study results (600 tokens, 20% overlap, natural context):
+    /// - "search result": File nDCG 0.859, Ans nDCG 0.937, Hit@1 90.7%
+    /// - "code retrieval": File nDCG 0.837, Ans nDCG 0.928, Hit@1 90.7%
+    /// - No prefix: File nDCG 0.860, Ans nDCG 0.919, Hit@1 88.9%
+    ///
+    /// "search result" provides best balanced performance.
     pub fn format_query(&self, text: &str) -> String {
+        self.format_query_with_task(text, "search result")
+    }
+
+    /// Format text as a query with a specific task type
+    /// Available tasks for EmbeddingGemma: "search result", "code retrieval", "clustering", etc.
+    pub fn format_query_with_task(&self, text: &str, task: &str) -> String {
         match self {
-            // EmbeddingGemma: "task: search result | query: {text}"
+            // EmbeddingGemma: "task: {task} | query: {text}"
             Self::EmbeddingGemma300M => {
-                format!("task: search result | query: {}", text)
+                format!("task: {} | query: {}", task, text)
             }
             // Qwen3-Embedding: "Instruct: {task}\nQuery: {text}"
             Self::Qwen3Embedding06B | Self::Qwen3Embedding4B | Self::Qwen3Embedding8B => {
@@ -60,7 +73,6 @@ impl MistralRsModel {
                 format!("title: none | text: {}", text)
             }
             // Qwen3-Embedding: documents don't need instruction prefix
-            // Using a simple format for passages
             Self::Qwen3Embedding06B | Self::Qwen3Embedding4B | Self::Qwen3Embedding8B => {
                 text.to_string()
             }

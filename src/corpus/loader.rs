@@ -193,6 +193,28 @@ pub struct CorpusConfig {
     /// Maximum tokens per chunk (for embedding model limits)
     /// Used by BoundedSemanticChunker to enforce hard limits
     pub max_tokens: usize,
+
+    /// Whether to inject file path context into chunks (semantic chunking)
+    pub inject_context: bool,
+
+    /// Context format for injection
+    pub context_format: ContextFormat,
+}
+
+/// Context injection format
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub enum ContextFormat {
+    /// No context injection
+    #[default]
+    None,
+    /// Comment-style: `// path/to/file.rs`
+    Comment,
+    /// Bracketed: `[file: path/to/file.rs]`
+    Bracket,
+    /// Natural language: `File: path/to/file.rs`
+    Natural,
+    /// Full breadcrumb with function signature: `File: path.rs | fn foo()`
+    Signature,
 }
 
 impl Default for CorpusConfig {
@@ -224,6 +246,8 @@ impl Default for CorpusConfig {
                 "/site-packages/".to_string(),
             ],
             max_tokens: 350, // Reduced for more chunks (research: 200-500 tokens optimal)
+            inject_context: false, // Default: no context injection
+            context_format: ContextFormat::None,
         }
     }
 }
@@ -274,6 +298,22 @@ impl CorpusConfig {
     /// Set maximum tokens per chunk (for embedding model limits)
     pub fn with_max_tokens(mut self, max_tokens: usize) -> Self {
         self.max_tokens = max_tokens;
+        self
+    }
+
+    /// Set whether to inject file path context into chunks
+    pub fn with_inject_context(mut self, inject: bool) -> Self {
+        self.inject_context = inject;
+        self
+    }
+
+    /// Set context format for injection
+    pub fn with_context_format(mut self, format: ContextFormat) -> Self {
+        self.context_format = format;
+        // Auto-enable inject_context when format is not None
+        if format != ContextFormat::None {
+            self.inject_context = true;
+        }
         self
     }
 
@@ -594,7 +634,7 @@ fn chunk_file_with_config(
         }
         Strategy::Semantic => {
             // Use BoundedSemanticChunker for code (research-based improvements)
-            // - No context injection (pure code)
+            // - Configurable context injection (file path prefix)
             // - Hard token limit enforcement
             // - Configurable overlap
             // - AST-aware splitting with fallback chain
@@ -604,10 +644,26 @@ fn chunk_file_with_config(
                         max_tokens: config.max_tokens,
                         target_tokens: (config.max_tokens as f32 * 0.8) as usize,
                         overlap_ratio: config.overlap,
-                        inject_context: false, // No context injection (research finding)
+                        inject_context: config.inject_context,
+                        context_format: config.context_format,
                     });
 
-                    let bounded_chunks = chunker.chunk(content, language);
+                    // Use chunk_with_file_context when context format is not None
+                    let bounded_chunks = if config.context_format != ContextFormat::None {
+                        chunker.chunk_with_file_context(content, language, &file_path_str)
+                    } else if config.inject_context {
+                        // Legacy: inject_context flag uses Comment format
+                        let legacy_chunker = BoundedSemanticChunker::new(BoundedChunkerConfig {
+                            max_tokens: config.max_tokens,
+                            target_tokens: (config.max_tokens as f32 * 0.8) as usize,
+                            overlap_ratio: config.overlap,
+                            inject_context: true,
+                            context_format: ContextFormat::Comment,
+                        });
+                        legacy_chunker.chunk_with_file_context(content, language, &file_path_str)
+                    } else {
+                        chunker.chunk(content, language)
+                    };
 
                     if bounded_chunks.is_empty() {
                         // Fall back to line-based if AST/semantic fails

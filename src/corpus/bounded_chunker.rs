@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tree_sitter::{Language, Node, Parser};
 
+use super::loader::ContextFormat;
+
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -37,6 +39,10 @@ pub struct BoundedChunkerConfig {
 
     /// Whether to inject context prefixes (should be false for best results)
     pub inject_context: bool,
+
+    /// Context format for injection
+    #[serde(default)]
+    pub context_format: ContextFormat,
 }
 
 impl Default for BoundedChunkerConfig {
@@ -49,6 +55,7 @@ impl Default for BoundedChunkerConfig {
             target_tokens: 280,  // ~1120 chars (80% of max)
             overlap_ratio: 0.25, // Match line chunker's 25% overlap
             inject_context: false,
+            context_format: ContextFormat::None,
         }
     }
 }
@@ -62,6 +69,7 @@ impl BoundedChunkerConfig {
             target_tokens: 280,
             overlap_ratio: 0.25,
             inject_context: false,
+            context_format: ContextFormat::None,
         }
     }
 
@@ -73,6 +81,7 @@ impl BoundedChunkerConfig {
             target_tokens: 160,  // ~640 chars (80% of max)
             overlap_ratio: 0.25, // Match line chunker
             inject_context: false,
+            context_format: ContextFormat::None,
         }
     }
 }
@@ -85,6 +94,7 @@ impl BoundedChunkerConfig {
             target_tokens: (model_max_tokens as f32 * 0.8) as usize,
             overlap_ratio: 0.25, // Match line chunker
             inject_context: false,
+            context_format: ContextFormat::None,
         }
     }
 
@@ -329,14 +339,27 @@ impl BoundedSemanticChunker {
                 .collect();
         }
 
-        // Add file path comment to each chunk
-        let comment_prefix = Self::get_comment_prefix(language);
-        let context_line = format!("{} {}\n", comment_prefix, file_path);
-        let context_tokens = self.count_tokens(&context_line);
+        // For Signature format, we need to extract signature per-chunk
+        let use_signature = matches!(self.config.context_format, ContextFormat::Signature);
 
         chunks
             .into_iter()
             .map(|mut chunk| {
+                // Extract signature if using Signature format
+                let signature = if use_signature {
+                    self.extract_signature(&chunk.content, language)
+                } else {
+                    None
+                };
+
+                // Format context with optional signature
+                let context_line = self.format_context_with_signature(
+                    language,
+                    file_path,
+                    signature.as_deref(),
+                );
+                let context_tokens = self.count_tokens(&context_line);
+
                 // Check if adding context would exceed max
                 let chunk_tokens = self.count_tokens(&chunk.content);
                 if chunk_tokens + context_tokens <= self.config.max_tokens {
@@ -351,12 +374,187 @@ impl BoundedSemanticChunker {
 
                 chunk.with_metadata(ChunkMetadata {
                     file_path: file_path.to_string(),
-                    function_context: None,
+                    function_context: signature.clone(),
                     class_context: None,
                     node_type: None,
                 })
             })
             .collect()
+    }
+
+    /// Format context line based on configured format
+    fn format_context_line(&self, language: &str, file_path: &str) -> String {
+        self.format_context_with_signature(language, file_path, None)
+    }
+
+    /// Format context line with optional function signature
+    fn format_context_with_signature(&self, language: &str, file_path: &str, signature: Option<&str>) -> String {
+        match self.config.context_format {
+            ContextFormat::None => String::new(),
+            ContextFormat::Comment => {
+                let comment_prefix = Self::get_comment_prefix(language);
+                format!("{} {}\n", comment_prefix, file_path)
+            }
+            ContextFormat::Bracket => {
+                format!("[file: {}]\n\n", file_path)
+            }
+            ContextFormat::Natural => {
+                format!("File: {}\n\n", file_path)
+            }
+            ContextFormat::Signature => {
+                match signature {
+                    Some(sig) => format!("File: {} | {}\n\n", file_path, sig),
+                    None => format!("File: {}\n\n", file_path),
+                }
+            }
+        }
+    }
+
+    /// Extract function/class signature from chunk content using AST
+    fn extract_signature(&self, content: &str, language: &str) -> Option<String> {
+        let ts_language = Self::get_tree_sitter_language(language)?;
+
+        let mut parser = Parser::new();
+        parser.set_language(&ts_language).ok()?;
+
+        let tree = parser.parse(content, None)?;
+        let root = tree.root_node();
+
+        // Find the first function/class/impl definition
+        self.find_first_definition(root, content, language)
+    }
+
+    /// Find the first function/class/impl definition in AST
+    fn find_first_definition(&self, node: Node, content: &str, language: &str) -> Option<String> {
+        let kind = node.kind();
+
+        // Check if this node is a definition we care about
+        let signature = match language {
+            "rust" => self.extract_rust_signature(node, content, kind),
+            "python" | "py" => self.extract_python_signature(node, content, kind),
+            "javascript" | "typescript" | "js" | "ts" | "jsx" | "tsx" =>
+                self.extract_js_signature(node, content, kind),
+            "go" => self.extract_go_signature(node, content, kind),
+            _ => None,
+        };
+
+        if signature.is_some() {
+            return signature;
+        }
+
+        // Recurse into children
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if let Some(sig) = self.find_first_definition(child, content, language) {
+                return Some(sig);
+            }
+        }
+
+        None
+    }
+
+    /// Extract Rust function/impl signature
+    fn extract_rust_signature(&self, node: Node, content: &str, kind: &str) -> Option<String> {
+        match kind {
+            "function_item" => {
+                // Find function name and params
+                let mut name = None;
+                let mut params = None;
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    match child.kind() {
+                        "identifier" if name.is_none() => {
+                            name = Some(&content[child.start_byte()..child.end_byte()]);
+                        }
+                        "parameters" => {
+                            params = Some(&content[child.start_byte()..child.end_byte()]);
+                        }
+                        _ => {}
+                    }
+                }
+                match (name, params) {
+                    (Some(n), Some(p)) => Some(format!("fn {}{}", n, p)),
+                    (Some(n), None) => Some(format!("fn {}", n)),
+                    _ => None,
+                }
+            }
+            "impl_item" => {
+                // Extract "impl Type" or "impl Trait for Type"
+                let text = &content[node.start_byte()..node.end_byte()];
+                let first_line = text.lines().next()?;
+                // Find up to opening brace
+                let sig = first_line.split('{').next()?.trim();
+                Some(sig.to_string())
+            }
+            "struct_item" | "enum_item" | "trait_item" => {
+                let text = &content[node.start_byte()..node.end_byte()];
+                let first_line = text.lines().next()?;
+                let sig = first_line.split('{').next()?.trim();
+                Some(sig.to_string())
+            }
+            _ => None,
+        }
+    }
+
+    /// Extract Python function/class signature
+    fn extract_python_signature(&self, node: Node, content: &str, kind: &str) -> Option<String> {
+        match kind {
+            "function_definition" => {
+                let text = &content[node.start_byte()..node.end_byte()];
+                // Get "def name(params):"
+                let first_line = text.lines().next()?;
+                Some(first_line.trim_end_matches(':').trim().to_string())
+            }
+            "class_definition" => {
+                let text = &content[node.start_byte()..node.end_byte()];
+                let first_line = text.lines().next()?;
+                Some(first_line.trim_end_matches(':').trim().to_string())
+            }
+            _ => None,
+        }
+    }
+
+    /// Extract JavaScript/TypeScript function/class signature
+    fn extract_js_signature(&self, node: Node, content: &str, kind: &str) -> Option<String> {
+        match kind {
+            "function_declaration" | "function" => {
+                let text = &content[node.start_byte()..node.end_byte()];
+                let first_line = text.lines().next()?;
+                let sig = first_line.split('{').next()?.trim();
+                Some(sig.to_string())
+            }
+            "class_declaration" => {
+                let text = &content[node.start_byte()..node.end_byte()];
+                let first_line = text.lines().next()?;
+                let sig = first_line.split('{').next()?.trim();
+                Some(sig.to_string())
+            }
+            "method_definition" => {
+                let text = &content[node.start_byte()..node.end_byte()];
+                let first_line = text.lines().next()?;
+                let sig = first_line.split('{').next()?.trim();
+                Some(sig.to_string())
+            }
+            _ => None,
+        }
+    }
+
+    /// Extract Go function signature
+    fn extract_go_signature(&self, node: Node, content: &str, kind: &str) -> Option<String> {
+        match kind {
+            "function_declaration" | "method_declaration" => {
+                let text = &content[node.start_byte()..node.end_byte()];
+                let first_line = text.lines().next()?;
+                let sig = first_line.split('{').next()?.trim();
+                Some(sig.to_string())
+            }
+            "type_declaration" => {
+                let text = &content[node.start_byte()..node.end_byte()];
+                let first_line = text.lines().next()?;
+                Some(first_line.trim().to_string())
+            }
+            _ => None,
+        }
     }
 
     /// Get the comment prefix for a language

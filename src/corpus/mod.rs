@@ -39,7 +39,7 @@ mod bounded_chunker_tests;
 
 // New generic API (recommended)
 pub use loader::{
-    Chunk, ContentType, CorpusConfig,
+    Chunk, ContentType, CorpusConfig, ContextFormat,
     load_corpus_generic,
     load_sample_texts,
 };

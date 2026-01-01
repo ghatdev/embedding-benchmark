@@ -66,6 +66,7 @@ impl FastEmbedModel {
                 format!("Represent this sentence for searching relevant passages: {}", text)
             }
             // EmbeddingGemma: "task: search result | query: {text}"
+            // Note: "search result" outperforms "code retrieval" in ablation tests
             Self::EmbeddingGemma300M => {
                 format!("task: search result | query: {}", text)
             }
